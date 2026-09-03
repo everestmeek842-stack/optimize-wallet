@@ -175,8 +175,6 @@ function notifyTelegram(message) {
   return {
     ok: true,
     message,
-    botToken,
-    chatId,
     timestamp: new Date().toISOString()
   };
 }

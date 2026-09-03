@@ -8,6 +8,7 @@
     "start": "node server.js",
     "server": "node server.js",
     "dev": "node server.js",
+    "build": "node build-verification.js",
     "verify": "node deployment-verification.js",
     "verify:deployment": "node deployment-verification.js",
     "build:android": "cd android && gradlew assembleRelease",
