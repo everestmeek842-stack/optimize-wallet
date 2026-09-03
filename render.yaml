@@ -9,7 +9,15 @@ services:
     envVars:
       - key: NODE_ENV
         value: production
+      - key: APP_ENV
+        value: production
+      - key: APP_NAME
+        value: Nexus Platform
       - key: FRONTEND_URL
+        sync: false
+      - key: BACKEND_URL
+        sync: false
+      - key: NEXT_PUBLIC_APP_URL
         sync: false
       - key: SUPABASE_URL
         sync: false
@@ -21,10 +29,46 @@ services:
         sync: false
       - key: TELEGRAM_CHAT_ID
         sync: false
+      - key: TELEGRAM_WEBHOOK_SECRET
+        sync: false
       - key: MASTER_WALLET_ADDRESS
         sync: false
       - key: MASTER_WALLET_NETWORK
         value: solana
+      - key: MASTER_WALLET_RPC_URL
+        sync: false
+      - key: SOLANA_RPC_URL
+        sync: false
+      - key: PHANTOM_APP_URL
+        value: https://phantom.app
+      - key: USDT_MINT
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: OPENROUTER_API_KEY
+        sync: false
+      - key: SUPABASE_JWT_SECRET
+        sync: false
+      - key: STRIPE_SECRET_KEY
+        sync: false
+      - key: ADMIN_API_KEY
+        sync: false
+      - key: SESSION_SECRET
+        sync: false
+      - key: PAYOUT_BATCH_INTERVAL_MINUTES
+        value: "15"
+      - key: CLAIM_FEE_PERCENT
+        value: "1.5"
+      - key: INSTANT_CLAIM_PREMIUM_PERCENT
+        value: "3.0"
+      - key: LOG_LEVEL
+        value: info
+      - key: ENABLE_TELEGRAM_ALERTS
+        value: "true"
+      - key: ENABLE_SUPABASE
+        value: "true"
+      - key: ENABLE_MASTER_WALLET
+        value: "true"
       - key: PAYOUT_PROVIDER
         sync: false
       - key: PAYOUT_API_KEY
