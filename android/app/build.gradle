@@ -1,0 +1,35 @@
+plugins {
+    id 'com.android.application'
+}
+
+def generatedWebAssets = layout.buildDirectory.dir("generated/assets/web")
+
+tasks.register("syncWebAssets", Copy) {
+    from(rootProject.projectDir.parentFile) {
+        include "index.html", "app.js", "styles.css"
+    }
+    into(generatedWebAssets)
+}
+
+android {
+    namespace 'com.nexus.aibrowser'
+    compileSdk 36
+
+    defaultConfig {
+        applicationId 'com.nexus.aibrowser'
+        minSdk 26
+        targetSdk 36
+        versionCode 1
+        versionName '1.0.0'
+    }
+
+    sourceSets {
+        main {
+            assets.srcDir(generatedWebAssets)
+        }
+    }
+}
+
+tasks.named("preBuild").configure {
+    dependsOn(tasks.named("syncWebAssets"))
+}

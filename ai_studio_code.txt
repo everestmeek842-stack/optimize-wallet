@@ -1,0 +1,1 @@
+ActivityManager: Killing 16480:com.aistudio.telegramminiapp.kxmpzq due to installPackageLI

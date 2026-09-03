@@ -1,0 +1,31 @@
+services:
+  - type: web
+    name: nexus-platform-api
+    env: node
+    plan: free
+    region: oregon
+    buildCommand: npm install
+    startCommand: node server.js
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: FRONTEND_URL
+        sync: false
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_ANON_KEY
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: TELEGRAM_BOT_TOKEN
+        sync: false
+      - key: TELEGRAM_CHAT_ID
+        sync: false
+      - key: MASTER_WALLET_ADDRESS
+        sync: false
+      - key: MASTER_WALLET_NETWORK
+        value: solana
+      - key: PAYOUT_PROVIDER
+        sync: false
+      - key: PAYOUT_API_KEY
+        sync: false

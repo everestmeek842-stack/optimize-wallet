@@ -1,0 +1,10 @@
+Link speed (Receive/Transmit):	1000/1000 (Mbps)
+IPv6 address:	fda2:3a1b:3a4b:5800:77f9:82b5:5723:1dc8
+Link-local IPv6 address:	fe80::979e:977b:13e9:9418%22
+IPv6 DNS servers:	fe80::a03a:1bff:fe3a:4b58%22
+IPv4 address:	192.168.8.8
+IPv4 DNS servers:	192.168.8.1
+Manufacturer:	Realtek
+Description:	Realtek PCIe GbE Family Controller
+Driver version:	10.79.1003.2025
+Physical address (MAC):	00-E0-4F-73-41-04

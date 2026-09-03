@@ -1,0 +1,608 @@
+{
+  "name": "Telegram Community Assistant (Gemini)",
+  "nodes": [
+    {
+      "parameters": {
+        "updates": [
+          "message"
+        ],
+        "additionalFields": {}
+      },
+      "id": "c07b4f84-2813-4f96-871d-c640fad90bbf",
+      "name": "Telegram Trigger",
+      "type": "n8n-nodes-base.telegramTrigger",
+      "typeVersion": 1.4,
+      "position": [
+        -1152,
+        -320
+      ],
+      "webhookId": "b42e25b2-5294-445a-b3f0-ec427be0c24b",
+      "credentials": {
+        "telegramApi": {
+          "id": "FxdYLQMTUKNXO5jH",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": false,
+                  "leftValue": "",
+                  "typeValidation": "loose",
+                  "version": 1
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.message.text }}",
+                    "rightValue": "/image",
+                    "operator": {
+                      "type": "string",
+                      "operation": "startsWith"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "image"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": false,
+                  "leftValue": "",
+                  "typeValidation": "loose",
+                  "version": 1
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.message.text }}",
+                    "rightValue": "/video",
+                    "operator": {
+                      "type": "string",
+                      "operation": "startsWith"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "video"
+            }
+          ]
+        },
+        "looseTypeValidation": true,
+        "options": {
+          "fallbackOutput": "extra",
+          "renameFallbackOutput": "chat"
+        }
+      },
+      "id": "823fd4e0-8e7f-4bf0-a8e6-93d643b17296",
+      "name": "Route Command",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.4,
+      "position": [
+        -928,
+        -336
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "image",
+        "modelId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "models/gemini-3.1-flash-image",
+          "cachedResultName": "models/gemini-3.1-flash-image (Nano Banana 2)"
+        },
+        "prompt": "={{ ($json.message.text || '').replace(/^\\/image/i, '').trim() || 'A cinematic, ultra-detailed futuristic city skyline at dusk with neon light, professional color grading.' }}",
+        "options": {
+          "binaryPropertyOutput": "data"
+        }
+      },
+      "id": "cdc46a2b-c1e1-4c40-903f-0defa76f270a",
+      "name": "Generate an image",
+      "type": "@n8n/n8n-nodes-langchain.googleGemini",
+      "typeVersion": 1.2,
+      "position": [
+        -640,
+        -512
+      ],
+      "credentials": {
+        "googlePalmApi": {
+          "id": "ez0TpvmJQrqoxtFu",
+          "name": "Google Gemini(PaLM) Api account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "sendPhoto",
+        "chatId": "={{ $('Telegram Trigger').item.json.message.chat.id }}",
+        "binaryData": true,
+        "additionalFields": {
+          "caption": "=🖼 {{ ($('Telegram Trigger').item.json.message.text || '').replace(/^\\/image/i, '').trim() || 'Cinematic render' }}",
+          "reply_to_message_id": "={{ $('Telegram Trigger').item.json.message.message_id }}"
+        }
+      },
+      "id": "47242b55-bac4-4a20-ba6f-c3ebf241eb92",
+      "name": "Send Photo",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        -352,
+        -512
+      ],
+      "webhookId": "252afee4-df53-4416-97b7-fb3e2741de72",
+      "credentials": {
+        "telegramApi": {
+          "id": "FxdYLQMTUKNXO5jH",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "video",
+        "modelId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "models/veo-3.1-generate-preview",
+          "cachedResultName": "models/veo-3.1-generate-preview"
+        },
+        "prompt": "={{ ($json.message.text || '').replace(/^\\/video/i, '').trim() || 'A highly realistic, cinematic HD video with professional lighting and color grading, perfect for TikTok and Instagram.' }}",
+        "options": {
+          "sampleCount": 1,
+          "durationSeconds": 8,
+          "aspectRatio": "16:9",
+          "personGeneration": "allow_all",
+          "binaryPropertyOutput": "data"
+        }
+      },
+      "id": "2aec25ca-bfc6-4eb7-bcf0-17f585fe118f",
+      "name": "Generate a video",
+      "type": "@n8n/n8n-nodes-langchain.googleGemini",
+      "typeVersion": 1.2,
+      "position": [
+        -640,
+        -320
+      ],
+      "credentials": {
+        "googlePalmApi": {
+          "id": "ez0TpvmJQrqoxtFu",
+          "name": "Google Gemini(PaLM) Api account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "sendVideo",
+        "chatId": "={{ $('Telegram Trigger').item.json.message.chat.id }}",
+        "binaryData": true,
+        "additionalFields": {
+          "caption": "=🎬 {{ ($('Telegram Trigger').item.json.message.text || '').replace(/^\\/video/i, '').trim() || 'Cinematic clip' }}",
+          "reply_to_message_id": "={{ $('Telegram Trigger').item.json.message.message_id }}"
+        }
+      },
+      "id": "b7526037-a211-4543-b479-8132e57662c0",
+      "name": "Send Video",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        -352,
+        -320
+      ],
+      "webhookId": "dc65cc70-c7f1-434f-bc9b-59b63313b8ff",
+      "credentials": {
+        "telegramApi": {
+          "id": "FxdYLQMTUKNXO5jH",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json.message.text }}",
+        "options": {
+          "systemMessage": "You are SREYMARA, a premium community assistant for a Telegram group. Answer members' questions clearly and concisely, help newcomers get oriented, share relevant information, and keep a positive, welcoming tone. Format replies with light HTML (<b>bold</b>, <i>italic</i>, <code>code</code>) since messages are sent with HTML parse mode. Keep replies short enough for a chat message. If a question is off-topic, unclear, or needs a human moderator (account issues, disputes, moderation), politely say so and suggest tagging an admin. You can also generate media: tell users they can type /image <prompt> for a cinematic image or /video <prompt> for a short cinematic video, or open the SREYMARA cinematic app from the menu.",
+          "returnIntermediateSteps": false,
+          "passthroughBinaryImages": true,
+          "enableStreaming": false
+        }
+      },
+      "id": "816955b7-d6b6-49df-9519-fde10a4b82ff",
+      "name": "Community Assistant",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        -704,
+        -16
+      ]
+    },
+    {
+      "parameters": {
+        "modelName": "models/gemini-2.0-flash-lite",
+        "options": {}
+      },
+      "id": "6345f8ae-5a4e-44e2-8197-f757ea5e53f8",
+      "name": "Google Gemini",
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1.1,
+      "position": [
+        -688,
+        224
+      ],
+      "credentials": {
+        "googlePalmApi": {
+          "id": "ez0TpvmJQrqoxtFu",
+          "name": "Google Gemini(PaLM) Api account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sessionIdType": "customKey",
+        "sessionKey": "={{ $('Telegram Trigger').item.json.message.chat.id }}",
+        "contextWindowLength": 10
+      },
+      "id": "7be7ea64-5332-4823-87db-3a21685612f4",
+      "name": "Chat Memory",
+      "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
+      "typeVersion": 1.4,
+      "position": [
+        -560,
+        224
+      ]
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Telegram Trigger').item.json.message.chat.id }}",
+        "text": "={{ $json.output }}",
+        "replyMarkup": "inlineKeyboard",
+        "inlineKeyboard": {
+          "rows": [
+            {
+              "row": {
+                "buttons": [
+                  {
+                    "text": "🎬 Open SREYMARA App",
+                    "additionalFields": {
+                      "web_app": {
+                        "url": "https://kansasnelly.app.n8n.cloud/webhook/sreymara-app"
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        "additionalFields": {
+          "appendAttribution": false,
+          "parse_mode": "HTML",
+          "reply_to_message_id": "={{ $('Telegram Trigger').item.json.message.message_id }}"
+        }
+      },
+      "id": "dc0ac0e6-54d1-49f7-8466-cd167a394050",
+      "name": "Send Reply",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        -352,
+        -16
+      ],
+      "webhookId": "73b6f58b-8dcf-4133-9408-50bea03716ef",
+      "credentials": {
+        "telegramApi": {
+          "id": "FxdYLQMTUKNXO5jH",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "path": "088dc7c3-2da7-483c-981a-4069e4e6ad6f",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "8813ec21-57e4-479e-9fb5-2c66f94dc862",
+      "name": "Serve Mini App",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        -1152,
+        320
+      ],
+      "webhookId": "b9fe12a1-6a9f-43a5-aa2f-301d1404946e"
+    },
+    {
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "<!doctype html>\n<html lang=\"en\">\n  <head>\n    <meta charset=\"UTF-8\" />\n    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\" />\n    <meta name=\"theme-color\" content=\"#0a0a0f\" />\n    <title>Nexus — AI browser & memory</title>\n    <link rel=\"stylesheet\" href=\"./styles.css\" />\n    <!-- Telegram WebApp, Solana Web3 & RichAds Scripts -->\n    <script src=\"https://telegram.org/js/telegram-web-app.js?63\"></script>\n    <script src=\"https://unpkg.com/@solana/web3.js@latest/lib/index.iife.min.js\"></script>\n    <script src=\"https://richinfo.co/richpartners/telegram/js/tg-ob.js\"></script>\n    <script>\n      window.TelegramAdsController = new TelegramAdsController();\n      window.TelegramAdsController.initialize({\n        pubId: \"1018890\",\n        appId: \"8326\",\n      });\n    </script>\n  </head>\n  <body>\n<!-- Optimize: App/Web Toggle -->\n<div id=\"optimize-header-toggle\" class=\"opt-component\">\n    <div class=\"opt-toggle-container\">\n        <button id=\"btn-app-view\" class=\"opt-toggle-btn active\">App View</button>\n        <button id=\"btn-web-view\" class=\"opt-toggle-btn\">Web Browser</button>\n    </div>\n</div>\n    <div class=\"app-shell\">\n      <aside class=\"sidebar\" aria-label=\"Workspace navigation\">\n        <div class=\"brand-row\">\n          <div class=\"brand-mark\">N</div>\n          <span>Nexus</span>\n          <button class=\"icon-button mobile-only\" id=\"closeSidebarButton\" aria-label=\"Close menu\">\n            <svg xmlns=\"http://www.w3.org/2000/svg\" width=\"18\" height=\"18\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><line x1=\"18\" y1=\"6\" x2=\"6\" y2=\"18\"></line><line x1=\"6\" y1=\"6\" x2=\"18\" y2=\"18\"></line></svg>\n          </button>\n        </div>\n\n        <button class=\"new-chat-button\" id=\"newChatButton\">\n          <svg xmlns=\"http://www.w3.org/2000/svg\" width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><line x1=\"12\" y1=\"5\" x2=\"12\" y2=\"19\"></line><line x1=\"5\" y1=\"12\" x2=\"19\" y2=\"12\"></line></svg>\n          <span>New conversation</span>\n        </button>\n\n        <nav class=\"nav-list\">\n          <button class=\"nav-item active\"><span>\n            <svg xmlns=\"http://www.w3.org/2000/svg\" width=\"18\" height=\"18\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z\"></path></svg>\n          </span> Chats</button>\n          <button class=\"nav-item\" id=\"openMemoryButton\"><span>\n            <svg xmlns=\"http://www.w3.org/2000/svg\" width=\"18\" height=\"18\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z\"></path><path d=\"M7 7m0 0a2 2 0 1 0 0 4 2 2 0 0 0 0-4z\"></path></svg>\n          </span> Memory vault</button>\n          <button class=\"nav-item\" id=\"openSettingsButton\"><span>\n            <svg xmlns=\"http://www.w3.org/2000/svg\" width=\"18\" height=\"18\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><circle cx=\"12\" cy=\"12\" r=\"3\"></circle><path d=\"M12 1v6m0 10v6M4.22 4.22l4.24 4.24m9.92 9.92l4.24 4.24M1 12h6m10 0h6\"></path></svg>\n          </span> Connections</button>\n        </nav>\n\n        <section class=\"chat-list-section\">\n          <div class=\"section-label\">Your conversations</div>\n          <div id=\"chatList\" class=\"chat-list\"></div>\n        </section>\n\n        <div class=\"sidebar-footer\">\n          <div class=\"privacy-note\"><span>●</span> Saved on this device</div>\n          <button class=\"text-button\" id=\"exportButton\">Export backup</button>\n          <label class=\"text-button import-label\" for=\"importInput\">Restore backup</label>\n          <input id=\"importInput\" type=\"file\" accept=\"application/json\" hidden />\n        </div>\n      </aside>\n\n      <main class=\"workspace\">\n        <header class=\"topbar\">\n          <div class=\"topbar-start\">\n            <button class=\"icon-button mobile-menu\" id=\"openSidebarButton\" aria-label=\"Open menu\">\n              <svg xmlns=\"http://www.w3.org/2000/svg\" width=\"20\" height=\"20\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><line x1=\"3\" y1=\"6\" x2=\"21\" y2=\"6\"></line><line x1=\"3\" y1=\"12\" x2=\"21\" y2=\"12\"></line><line x1=\"3\" y1=\"18\" x2=\"21\" y2=\"18\"></line></svg>\n            </button>\n            <div>\n              <div class=\"eyebrow\" id=\"conversationProvider\">GEMINI</div>\n              <h1 id=\"conversationTitle\">New conversation</h1>\n            </div>\n          </div>\n          <div class=\"topbar-actions\">\n            <button class=\"status-pill\" id=\"connectionButton\"><span></span> Connect AI</button>\n            <button class=\"icon-button\" id=\"clearChatButton\" aria-label=\"Clear current chat\">\n              <svg xmlns=\"http://www.w3.org/2000/svg\" width=\"20\" height=\"20\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M2.5 5h19\"><line x1=\"18\" y1=\"6\" x2=\"6\" y2=\"18\"></line></path></line><path d=\"M6 6V3a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v3\"></path><path d=\"M6 6l2 14a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1l2-14\"></path><path d=\"M10 11v6\"></path><path d=\"M14 11v6\"></path><path d=\"M9 6V3a3 3 0 0 1 3-3h0a3 3 0 0 1 3 3v3\"></path></svg>\n            </button>\n          </div>\n        </header>\n\n        <section class=\"chat-panel\">\n          <div id=\"emptyState\" class=\"empty-state\">\n            <div class=\"empty-orb\"></div>\n            <p class=\"eyebrow\">Private AI workspace</p>\n            <h2>What do you want to explore?</h2>\n            <p>Chat with Gemini or OpenRouter, research the web, then keep the important parts in your memory vault.</p>\n            <div class=\"suggestion-grid\">\n              <button class=\"suggestion\" data-prompt=\"Search the web and summarize today's important updates about \">Search the web <span>Current updates and sources</span></button>\n              <button class=\"suggestion\" data-prompt=\"Help me plan this project: \">Plan something <span>Turn a goal into clear next steps</span></button>\n              <button class=\"suggestion\" data-prompt=\"Remember this for future conversations: \">Save a memory <span>Keep a detail for later</span></button>\n            </div>\n          </div>\n          <div id=\"messageList\" class=\"message-list\" aria-live=\"polite\"></div>\n        </section>\n\n        <form id=\"composerForm\" class=\"composer\">\n          <div class=\"composer-controls\">\n            <select id=\"providerSelect\" aria-label=\"AI provider\">\n              <option value=\"gemini\">Gemini</option>\n              <option value=\"openrouter\">OpenRouter</option>\n            </select>\n            <label class=\"web-toggle\" title=\"Let Gemini use Google Search grounding. For OpenRouter, the app adds free web search results to your prompt.\">\n              <input id=\"webToggle\" type=\"checkbox\" checked />\n              <span></span> Use web\n            </label>\n          </div>\n          <textarea id=\"messageInput\" rows=\"1\" placeholder=\"Message Nexus…\"></textarea>\n          <button id=\"sendButton\" class=\"send-button\" type=\"submit\" aria-label=\"Send message\">\n            <svg xmlns=\"http://www.w3.org/2000/svg\" width=\"20\" height=\"20\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><line x1=\"22\" y1=\"2\" x2=\"11\" y2=\"13\"></line><polygon points=\"22 2 11 13 11 2 22 2\"></polygon></svg>\n          </button>\n          <p class=\"composer-hint\">Press Enter to send · Shift + Enter for a new line</p>\n        </form>\n      </main>\n\n      <aside class=\"browser-panel\" aria-label=\"Mobile web browser and memory\">\n        <header class=\"browser-header\">\n          <div>\n            <div class=\"eyebrow\">Research companion</div>\n            <h2>Mini browser</h2>\n          </div>\n          <button class=\"icon-button browser-mobile-close\" id=\"closeBrowserButton\" aria-label=\"Close browser\">\n            <svg xmlns=\"http://www.w3.org/2000/svg\" width=\"18\" height=\"18\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><line x1=\"18\" y1=\"6\" x2=\"6\" y2=\"18\"></line><line x1=\"6\" y1=\"6\" x2=\"18\" y2=\"18\"></line></svg>\n          </button>\n        </header>\n\n        <form id=\"browserForm\" class=\"address-bar\">\n          <span>\n            <svg xmlns=\"http://www.w3.org/2000/svg\" width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><circle cx=\"11\" cy=\"11\" r=\"8\"></circle><line x1=\"22\" y1=\"22\" x2=\"16.65\" y2=\"16.65\"></line></svg>\n          </span>\n          <input id=\"browserInput\" autocomplete=\"off\" placeholder=\"Search the web or paste a link\" />\n          <button type=\"submit\">Go</button>\n        </form>\n        <div class=\"browser-actions\">\n          <button id=\"useResearchButton\">Use in chat</button>\n          <button id=\"openExternalButton\" disabled>\n            <svg xmlns=\"http://www.w3.org/2000/svg\" width=\"14\" height=\"14\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" style=\"display:inline-block;vertical-align:-2px;margin-left:4px;\"><path d=\"M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6\"></path><line x1=\"15\" y1=\"12\" x2=\"19\" y2=\"8\"></line><line x1=\"19\" y1=\"8\" x2=\"19\" y2=\"8\"></line><polyline points=\"19 8 19 12 15 12\"></polyline></svg>\n            Open ↗\n          </button>\n        </div>\n        <div id=\"browserResults\" class=\"browser-results\">\n          <div class=\"browser-placeholder\">\n            <div class=\"browser-phone\"><div class=\"browser-phone-line\"></div><div class=\"browser-phone-card\"></div><div class=\"browser-phone-card short\"></div></div>\n            <h3>A free, private research view</h3>\n            <p>Search here, then add the results to your AI conversation. Links open in your normal browser when a site blocks embedding.</p>\n          </div>\n        </div>\n\n        <section class=\"memory-card\">\n          <div class=\"memory-heading\"><div><div class=\"eyebrow\">Long-term context</div><h3>Memory card</h3></div><button class=\"text-button\" id=\"openMemoryButtonSecondary\">View all</button></div>\n          <p id=\"memoryPreview\">Save facts, preferences, plans, and promises so future conversations can pick up where you left off.</p>\n          <button class=\"save-memory-button\" id=\"saveBrowserMemoryButton\">\n            <svg xmlns=\"http://www.w3.org/2000/svg\" width=\"14\" height=\"14\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" style=\"display:inline-block;vertical-align:-2px;margin-right:6px;\"><path d=\"M19 21H5a2 2 0 0 1-2-2V7h18v12a2 2 0 0 1-2 2z\"></path><path d=\"M1 7l10-5 10 5v10l-10 5-10-5z\"></path></svg>\n            Save research as memory\n          </button>\n        </section>\n      </aside>\n    </div>\n\n    <button class=\"floating-browser-button\" id=\"openBrowserButton\" aria-label=\"Open mini browser\">\n      <svg xmlns=\"http://www.w3.org/2000/svg\" width=\"22\" height=\"22\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><circle cx=\"12\" cy=\"12\" r=\"10\"></circle><line x1=\"2\" y1=\"12\" x2=\"22\" y2=\"12\"></line><path d=\"M12 2a15.3 15.3 0 0 1 4 12.6v2.4a.6.6 0 0 1-.6.6H7.6a.6.6 0 0 1-.6-.6v-2.4A15.3 15.3 0 0 1 12 2z\"></path></svg>\n    </button>\n    <div id=\"scrim\" class=\"scrim\"></div>\n\n    <dialog id=\"settingsDialog\" class=\"modal\">\n      <form method=\"dialog\" id=\"settingsForm\">\n        <div class=\"modal-header\"><div><div class=\"eyebrow\">Private connections</div><h2>AI providers</h2></div><button class=\"icon-button\" value=\"cancel\" aria-label=\"Close\">\n          <svg xmlns=\"http://www.w3.org/2000/svg\" width=\"18\" height=\"18\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><line x1=\"18\" y1=\"6\" x2=\"6\" y2=\"18\"></line><line x1=\"6\" y1=\"6\" x2=\"18\" y2=\"18\"></line></svg>\n        </button></div>\n        <p class=\"modal-intro\">Keys are never bundled into this app. By default they stay in this browser only; uncheck \"Remember on this device\" to use them for this session only.</p>\n        <label class=\"field-label\">Gemini API key<input id=\"geminiKeyInput\" type=\"password\" autocomplete=\"off\" placeholder=\"AIza…\" /></label>\n        <label class=\"field-label\">Gemini model<input id=\"geminiModelInput\" type=\"text\" value=\"gemini-2.5-flash\" /></label>\n        <label class=\"field-label\">OpenRouter API key<input id=\"openrouterKeyInput\" type=\"password\" autocomplete=\"off\" placeholder=\"sk-or-v1-…\" /></label>\n        <label class=\"field-label\">OpenRouter model<input id=\"openrouterModelInput\" type=\"text\" value=\"google/gemini-2.5-flash\" /></label>\n        <label class=\"remember-keys\"><input id=\"rememberKeysInput\" type=\"checkbox\" /> Remember keys on this device</label>\n        <div class=\"modal-actions\"><button class=\"secondary-button\" value=\"cancel\">Cancel</button><button class=\"primary-button\" id=\"saveSettingsButton\" value=\"default\">Save connections</button></div>\n      </form>\n    </dialog>\n\n    <dialog id=\"memoryDialog\" class=\"modal memory-modal\">\n      <form method=\"dialog\" id=\"memoryForm\">\n        <div class=\"modal-header\"><div><div class=\"eyebrow\">Long-term context</div><h2>Memory vault</h2></div><button class=\"icon-button\" value=\"cancel\" aria-label=\"Close\">\n          <svg xmlns=\"http://www.w3.org/2000/svg\" width=\"18\" height=\"18\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><line x1=\"18\" y1=\"6\" x2=\"6\" y2=\"18\"></line><line x1=\"6\" y1=\"6\" x2=\"18\" y2=\"18\"></line></svg>\n        </button></div>\n        <p class=\"modal-intro\">These notes are automatically included as context in future AI requests. Keep only the details you really want remembered.</p>\n        <textarea id=\"newMemoryInput\" rows=\"3\" placeholder=\"Example: I prefer concise answers and I am planning to launch the app in August.\"></textarea>\n        <button id=\"addMemoryButton\" class=\"primary-button full-button\" type=\"button\">Save memory</button>\n        <div id=\"memoryList\" class=\"memory-list\"></div>\n      </form>\n    </dialog>\n\n    <template id=\"messageTemplate\">\n      <article class=\"message\">\n        <div class=\"message-avatar\"></div>\n        <div class=\"message-content\"><div class=\"message-meta\"></div><div class=\"message-text\"></div><button class=\"save-message-memory\">Save to memory</button></div>\n      </article>\n    </template>\n\n    <script src=\"https://telegram.org/js/telegram-web-app.js\"></script>\n    <script src=\"./app.js\" type=\"module\"></script>\n  \n<!-- Optimize: Nelli's TV Live Cinema -->\n<div id=\"nelly-tv-card\" class=\"opt-component\">\n    <div class=\"opt-card-header\">\n        <h3>📺 NELLI'S TV — LIVE CINEMA</h3>\n        <button id=\"btn-pip-nelly\" class=\"opt-pip-btn\">PiP</button>\n    </div>\n    <div class=\"opt-video-wrap\">\n        <video id=\"nelly-video\" controls playsinline autoplay muted>\n            <source src=\"https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8\" type=\"application/x-mpegURL\">\n        </video>\n    </div>\n    <div class=\"opt-channels\">\n        <button class=\"opt-ch-btn active\" data-src=\"https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8\">WWE Live</button>\n        <button class=\"opt-ch-btn\" data-src=\"https://samples.mux.com/VZ7tC2bWRCg01InAr7WZZPv7dFrSqiMdfSgBmDAnZ2Ws.mp4\">Khmer Cinema</button>\n        <button class=\"opt-ch-btn\" data-src=\"https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4\">English Movies</button>\n    </div>\n</div>\n<!-- Optimize: Web Browser Workspace -->\n<div id=\"opt-browser-workspace\" class=\"opt-component opt-hidden\">\n    <div class=\"opt-browser-bar\">\n        <button class=\"opt-nav-btn\" id=\"browser-back\">\n            <svg xmlns=\"http://www.w3.org/2000/svg\" width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><line x1=\"20\" y1=\"12\" x2=\"4\" y2=\"12\"></line><polyline points=\"10 18 4 12 10 6\"></polyline></svg>\n        </button>\n        <button class=\"opt-nav-btn\" id=\"browser-fwd\">\n            <svg xmlns=\"http://www.w3.org/2000/svg\" width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><line x1=\"4\" y1=\"12\" x2=\"20\" y2=\"12\"></line><polyline points=\"14 6 20 12 14 18\"></polyline></svg>\n        </button>\n        <button class=\"opt-nav-btn\" id=\"browser-refresh\">\n            <svg xmlns=\"http://www.w3.org/2000/svg\" width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M21.5 2v6h-6\"></path><path d=\"M11 22A9.5 9.5 0 0 1 7.5 7.5C7.5 5 9.5 3 12 3s4.5 2.5 4.5 5\"></path></svg>\n        </button>\n        <input type=\"text\" id=\"browser-url-input\" value=\"https://earnings.ink\" placeholder=\"URL or search...\">\n        <button class=\"opt-go-btn\" id=\"browser-go\">Go</button>\n    </div>\n    <div class=\"opt-browser-view\">\n        <iframe id=\"browser-iframe\" src=\"about:blank\" sandbox=\"allow-scripts allow-same-origin allow-forms allow-popups\"></iframe>\n    </div>\n</div>\n<!-- Optimize: AI Assistant & Writer Modal -->\n<div id=\"opt-ai-modal\" class=\"opt-component opt-hidden\">\n    <div class=\"opt-ai-content\">\n        <div class=\"opt-ai-header\">\n            <h3>🤖 AI Assistant & Writer</h3>\n            <span class=\"opt-close-modal\">\n                <svg xmlns=\"http://www.w3.org/2000/svg\" width=\"20\" height=\"20\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><line x1=\"18\" y1=\"6\" x2=\"6\" y2=\"18\"></line><line x1=\"6\" y1=\"6\" x2=\"18\" y2=\"18\"></line></svg>\n            </span>\n        </div>\n        <div class=\"opt-ai-body\">\n            <textarea id=\"opt-ai-input\" placeholder=\"Select text on screen or type here...\"></textarea>\n            <div class=\"opt-presets\">\n                <div class=\"opt-preset-group\">\n                    <label>Style</label>\n                    <button class=\"opt-preset-btn\" data-action=\"style\" data-value=\"Formal\">Formal</button>\n                    <button class=\"opt-preset-btn\" data-action=\"style\" data-value=\"Short\">Short</button>\n                    <button class=\"opt-preset-btn\" data-action=\"style\" data-value=\"Creative\">Creative</button>\n                    <button class=\"opt-preset-btn\" data-action=\"style\" data-value=\"Tribal\">Tribal</button>\n                </div>\n                <div class=\"opt-preset-group\">\n                    <label>Translate</label>\n                    <button class=\"opt-preset-btn\" data-action=\"translate\" data-value=\"Khmer\">Khmer</button>\n                    <button class=\"opt-preset-btn\" data-action=\"translate\" data-value=\"English\">English</button>\n                    <button class=\"opt-preset-btn\" data-action=\"translate\" data-value=\"Spanish\">Spanish</button>\n                </div>\n                <div class=\"opt-preset-group\">\n                    <label>Tools</label>\n                    <button class=\"opt-preset-btn\" data-action=\"emojify\">Emojify</button>\n                    <button class=\"opt-preset-btn\" data-action=\"fix\">Fix Grammar</button>\n                </div>\n            </div>\n            <div class=\"opt-ai-output-section\">\n                <label>Response:</label>\n                <div id=\"opt-ai-output\" class=\"opt-ai-output-box\">Select an option above...</div>\n                <button id=\"opt-copy-ai\" class=\"opt-action-btn\">Copy to Clipboard</button>\n            </div>\n        </div>\n    </div>\n</div>\n<div id=\"opt-floating-ai\" class=\"opt-component\">💬 AI Assistant</div>\n</body>\n</html>\n",
+        "options": {
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Content-Type",
+                "value": "text/html; charset=utf-8"
+              }
+            ]
+          }
+        }
+      },
+      "id": "cbdcc3b5-e7c6-43ec-aa72-6b9442534370",
+      "name": "Serve Page",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        -928,
+        320
+      ]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "sreymara-chat",
+        "responseMode": "responseNode",
+        "options": {
+          "allowedOrigins": "*"
+        }
+      },
+      "id": "416d4b6b-7d1b-450f-868b-74696631a2fc",
+      "name": "Mini App Chat API",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        -1152,
+        656
+      ],
+      "webhookId": "30d61919-e432-406a-b587-7c4da6fb5498"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json.body.message }}",
+        "options": {
+          "systemMessage": "You are SREYMARA, a premium cinematic assistant answering inside a custom Telegram Mini App. Reply in plain text (no HTML tags) since the app renders raw text. Be clear, concise, helpful, and welcoming.",
+          "returnIntermediateSteps": false,
+          "enableStreaming": false
+        }
+      },
+      "id": "b6aa10b9-2250-4de1-8f8b-fd0f1a051fc9",
+      "name": "App Assistant",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        -928,
+        656
+      ]
+    },
+    {
+      "parameters": {
+        "modelName": "models/gemini-2.0-flash-lite",
+        "options": {}
+      },
+      "id": "f80e98a6-b13c-4af1-aaa3-ac8eb4462fd6",
+      "name": "Gemini (App)",
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1.1,
+      "position": [
+        -912,
+        880
+      ],
+      "credentials": {
+        "googlePalmApi": {
+          "id": "ez0TpvmJQrqoxtFu",
+          "name": "Google Gemini(PaLM) Api account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sessionIdType": "customKey",
+        "sessionKey": "={{ $('Mini App Chat API').item.json.body.sessionId }}",
+        "contextWindowLength": 10
+      },
+      "id": "e9cf1702-a7ab-483e-b599-5ee4d26b06ec",
+      "name": "App Memory",
+      "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
+      "typeVersion": 1.4,
+      "position": [
+        -784,
+        880
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ reply: $json.output }) }}",
+        "options": {
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Access-Control-Allow-Origin",
+                "value": "*"
+              }
+            ]
+          }
+        }
+      },
+      "id": "40b837eb-113c-468e-91f3-f1a82398aa87",
+      "name": "Respond to App",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        -576,
+        656
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Telegram Trigger": {
+      "main": [
+        [
+          {
+            "node": "Route Command",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Route Command": {
+      "main": [
+        [
+          {
+            "node": "Generate an image",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Generate a video",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Community Assistant",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate an image": {
+      "main": [
+        [
+          {
+            "node": "Send Photo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate a video": {
+      "main": [
+        [
+          {
+            "node": "Send Video",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Community Assistant": {
+      "main": [
+        [
+          {
+            "node": "Send Reply",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Gemini": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Community Assistant",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Chat Memory": {
+      "ai_memory": [
+        [
+          {
+            "node": "Community Assistant",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Serve Mini App": {
+      "main": [
+        [
+          {
+            "node": "Serve Page",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mini App Chat API": {
+      "main": [
+        [
+          {
+            "node": "App Assistant",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "App Assistant": {
+      "main": [
+        [
+          {
+            "node": "Respond to App",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gemini (App)": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "App Assistant",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "App Memory": {
+      "ai_memory": [
+        [
+          {
+            "node": "App Assistant",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "713e954f-f8da-4bfe-8175-a62496d17afe",
+  "meta": {
+    "instanceId": "f67b3f6daf43b4b447f7eefd214d47ff6b26d7da1b40522eeddc2604dc2fb340"
+  },
+  "nodeGroups": [],
+  "id": "6Yag6PV3T6WOAvVa",
+  "tags": []
+}

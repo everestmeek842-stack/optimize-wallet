@@ -1,0 +1,423 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>SREYMARA Executive Hub V3.6 Backup</title>
+  
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@700;900&family=Plus+Jakarta+Sans:wght@400;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+  
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Plus Jakarta Sans', 'sans-serif'],
+            cinzel: ['Cinzel', 'serif'],
+            mono: ['JetBrains Mono', 'monospace'],
+          },
+          colors: {
+            luxuryGold: '#D4AF37',
+            luxuryGoldHover: '#F3CD5F',
+            cyberBlack: '#090A0F',
+            darkCard: '#12141C',
+            accentCyan: '#00F0FF',
+            accentPurple: '#8A2BE2',
+          }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    body { background-color: #090A0F; color: #E2E8F0; overflow-x: hidden; }
+    .gold-gradient-text {
+      background: linear-gradient(135deg, #FFF6D6 0%, #D4AF37 50%, #8A6F27 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    .gold-border {
+      box-shadow: 0 0 15px rgba(212, 175, 55, 0.1);
+      border: 1px solid rgba(212, 175, 55, 0.25);
+    }
+    .no-scrollbar::-webkit-scrollbar { display: none; }
+    .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+  </style>
+
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+</head>
+<body class="font-sans antialiased no-scrollbar pb-24">
+
+  <!-- TOP HEADER -->
+  <header id="app-header" class="sticky top-0 z-50 bg-cyberBlack/90 backdrop-blur-md border-b border-gray-800 px-4 py-3 flex items-center justify-between">
+    <div class="flex items-center space-x-3">
+      <div class="w-9 h-9 rounded-full bg-gradient-to-tr from-luxuryGold to-accentPurple p-[1px] flex items-center justify-center">
+        <div class="w-full h-full rounded-full bg-cyberBlack flex items-center justify-center font-cinzel text-xs text-luxuryGold font-bold">SM</div>
+      </div>
+      <div>
+        <h1 class="font-cinzel text-sm font-black tracking-wider gold-gradient-text">SREYMARA</h1>
+        <p class="text-[10px] text-accentCyan font-mono tracking-widest uppercase">VIP Executive Core</p>
+      </div>
+    </div>
+    
+    <div class="flex items-center space-x-2">
+      <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium font-mono bg-green-500/10 text-green-400 border border-green-500/20">
+        <span class="w-1.5 h-1.5 mr-1 bg-green-400 rounded-full animate-pulse"></span> SYSTEM OK
+      </span>
+      <button id="btn-open-store-header" class="gold-border px-2.5 py-1 rounded bg-luxuryGold/10 hover:bg-luxuryGold/20 transition text-xs font-semibold text-luxuryGold flex items-center gap-1">
+        💎 STORE
+      </button>
+    </div>
+  </header>
+
+  <!-- TOAST CONTAINER -->
+  <div id="toast-container" class="fixed top-16 left-1/2 -translate-x-1/2 z-50 w-11/12 max-w-sm pointer-events-none"></div>
+
+  <!-- MAIN HUB WRAPPER -->
+  <div id="main-hub-wrapper">
+    <main class="max-w-md mx-auto px-4 mt-4 space-y-6">
+
+      <!-- VIEW: DASHBOARD -->
+      <section id="view-dashboard" class="space-y-6">
+        <div class="relative overflow-hidden rounded-2xl bg-gradient-to-br from-darkCard to-black p-5 gold-border">
+          <div class="flex justify-between items-center mb-4">
+            <span class="text-xs font-mono text-gray-400 uppercase tracking-wider">Solana BaaS Safe Pot</span>
+            <span id="wallet-address" class="text-xs font-mono text-luxuryGold bg-luxuryGold/10 px-2 py-0.5 rounded cursor-pointer">Sol3v...9mRa</span>
+          </div>
+
+          <div class="space-y-4">
+            <div>
+              <p class="text-xs text-gray-400">Total $SREYMARA Balance</p>
+              <div class="flex items-baseline space-x-2">
+                <span id="sreymara-balance" class="text-3xl font-extrabold text-white tracking-tight">1,250,000.00</span>
+                <span class="text-sm font-bold text-luxuryGold">$SREYMARA</span>
+              </div>
+            </div>
+
+            <div class="grid grid-cols-2 gap-3 pt-4 border-t border-gray-800/80">
+              <div>
+                <p class="text-[10px] text-gray-400">Secondary Pot ($NELLY)</p>
+                <div class="flex items-baseline space-x-1">
+                  <span id="nelly-balance" class="text-sm font-bold text-white">45,820.00</span>
+                  <span class="text-[10px] font-semibold text-accentPurple">$NELLY</span>
+                </div>
+              </div>
+              <div>
+                <p class="text-[10px] text-gray-400">Yield Protocol APY</p>
+                <span class="text-sm font-bold text-green-400">+14.22%</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-2 gap-2.5 mt-5">
+            <button id="btn-claim" class="w-full bg-gradient-to-r from-luxuryGold to-yellow-600 hover:from-luxuryGoldHover hover:to-yellow-500 text-black font-extrabold text-xs py-2.5 px-4 rounded-xl transition-all shadow-md active:scale-95 flex items-center justify-center gap-1.5">
+              🪂 Claim Hourly
+            </button>
+            <button id="btn-open-store-hero" class="w-full bg-zinc-800 hover:bg-zinc-700 text-white font-bold text-xs py-2.5 px-4 rounded-xl transition-all border border-zinc-700 active:scale-95 flex items-center justify-center gap-1.5">
+              🇰🇭 KHQR Top-Up
+            </button>
+          </div>
+        </div>
+
+        <div class="bg-darkCard rounded-xl p-4 border border-gray-800 space-y-3">
+          <div class="flex justify-between items-center">
+            <div class="flex items-center space-x-2">
+              <span class="text-yellow-400 text-lg">⚡️</span>
+              <h3 class="text-xs font-bold uppercase tracking-wider text-gray-300">Dual-Pipeline Ad Monetization</h3>
+            </div>
+            <span class="text-[10px] font-mono text-accentCyan bg-accentCyan/10 px-1.5 py-0.5 rounded">AUTO-FAILOVER ACTIVE</span>
+          </div>
+          <p class="text-xs text-gray-400">View premium ads and stream revenue directly to the $SREYMARA Safe Pot pipeline.</p>
+          <button id="btn-ad-reward" class="w-full py-3 bg-gradient-to-r from-accentPurple to-indigo-700 hover:from-purple-500 hover:to-indigo-600 rounded-lg text-xs font-extrabold tracking-wider uppercase text-white transition active:scale-95 flex items-center justify-center gap-2">
+            📺 LOAD PREMIUM VIDEO REWARD (+500 $SREYMARA)
+          </button>
+        </div>
+      </section>
+
+      <!-- VIEW: CINEMA -->
+      <section id="view-cinema" class="hidden space-y-4">
+        <div class="flex justify-between items-center">
+          <div>
+            <h2 class="font-cinzel text-lg font-bold text-white tracking-wide">Regional Cinema</h2>
+            <p class="text-[10px] text-gray-400">Live Broadcasting Feed</p>
+          </div>
+          <span class="text-xs bg-red-600/20 text-red-400 border border-red-500/30 px-2 py-0.5 rounded font-mono font-semibold animate-pulse">🔴 LIVE</span>
+        </div>
+
+        <div class="aspect-video w-full bg-black rounded-xl overflow-hidden border border-gray-800 relative">
+          <iframe id="cinema-iframe" class="w-full h-full" src="https://www.youtube.com/embed/jfKfPfyJRdk" title="Sreymara Cinema" frameborder="0" allowfullscreen></iframe>
+        </div>
+      </section>
+
+      <!-- VIEW: PALACE -->
+      <section id="view-social" class="hidden space-y-4">
+        <div>
+          <h2 class="font-cinzel text-lg font-bold text-white tracking-wide">Social Palace</h2>
+          <p class="text-[10px] text-gray-400">Complete SREYMARA Tasks</p>
+        </div>
+
+        <div class="space-y-3">
+          <div class="bg-darkCard p-4 rounded-xl border border-gray-800 flex justify-between items-center">
+            <div>
+              <h4 class="text-sm font-bold text-white">Join Telegram Channel</h4>
+              <p class="text-xs text-gray-400">+5,000 $SREYMARA</p>
+            </div>
+            <button id="btn-verify-tg" class="bg-luxuryGold text-black text-xs font-extrabold px-3 py-2 rounded-lg">Verify</button>
+          </div>
+        </div>
+      </section>
+
+    </main>
+
+    <!-- FOOTER NAV -->
+    <nav class="fixed bottom-0 inset-x-0 bg-cyberBlack/95 border-t border-gray-800 py-2.5 px-6 z-40">
+      <div class="max-w-md mx-auto flex justify-between items-center">
+        <button id="nav-hub" class="flex flex-col items-center space-y-1 focus:outline-none">
+          <span class="text-lg">🏛️</span>
+          <span class="text-[9px] font-semibold text-gray-400">Hub</span>
+        </button>
+        <button id="nav-cinema" class="flex flex-col items-center space-y-1 focus:outline-none">
+          <span class="text-lg">🎬</span>
+          <span class="text-[9px] font-semibold text-gray-400">Cinema</span>
+        </button>
+        <button id="nav-palace" class="flex flex-col items-center space-y-1 focus:outline-none">
+          <span class="text-lg">🏰</span>
+          <span class="text-[9px] font-semibold text-gray-400">Palace</span>
+        </button>
+      </div>
+    </nav>
+  </div>
+
+  <!-- ISOLATED FULL STORE PAGE -->
+  <div id="full-store-page" class="hidden fixed inset-0 z-50 bg-[#090A0F] overflow-y-auto p-4 space-y-6">
+    <div class="flex justify-between items-center border-b border-gray-800 pb-3">
+      <div>
+        <h2 class="font-cinzel text-base font-bold text-luxuryGold">OFFICIAL ACLEDA KHQR STORE</h2>
+        <p class="text-[10px] text-gray-400 font-mono">Official Banking Rail • Auto-Credit Active</p>
+      </div>
+      <button id="btn-close-store" class="bg-luxuryGold hover:bg-luxuryGoldHover text-black font-extrabold text-xs px-4 py-2 rounded-xl transition active:scale-95">
+        ✕ CLOSE
+      </button>
+    </div>
+
+    <div class="space-y-2">
+      <label class="block text-xs font-bold text-gray-300 uppercase">Select Top-Up Package:</label>
+      <div class="grid grid-cols-3 gap-2">
+        <button id="pkg-1" class="pkg-btn bg-zinc-900 border-2 border-luxuryGold p-2.5 rounded-xl text-center">
+          <span class="block text-xs font-extrabold text-yellow-400">100 🪙</span>
+          <span class="block text-xs font-bold text-white">$1.00 USD</span>
+          <span class="block text-[9px] text-gray-400">4,100 KHR</span>
+        </button>
+        <button id="pkg-5" class="pkg-btn bg-zinc-900 border-2 border-transparent p-2.5 rounded-xl text-center">
+          <span class="block text-xs font-extrabold text-yellow-400">550 🪙</span>
+          <span class="block text-xs font-bold text-white">$5.00 USD</span>
+          <span class="block text-[9px] text-green-400">+10% Bonus</span>
+        </button>
+        <button id="pkg-20" class="pkg-btn bg-zinc-900 border-2 border-transparent p-2.5 rounded-xl text-center">
+          <span class="block text-xs font-extrabold text-yellow-400">2,500 👑</span>
+          <span class="block text-xs font-bold text-white">$20.00 USD</span>
+          <span class="block text-[9px] text-luxuryGold">VIP Pass</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- KHQR GATEWAY CARD -->
+    <div class="bg-darkCard p-5 rounded-2xl border border-gray-800 space-y-4 max-w-sm mx-auto shadow-2xl">
+      <div class="flex items-center justify-between border-b border-gray-800 pb-2">
+        <span class="text-xs font-bold text-white">🇰🇭 ACLEDA / BAKONG KHQR GATEWAY</span>
+        <span class="text-[9px] bg-green-500/20 text-green-400 px-2 py-0.5 rounded font-mono">VERIFIED</span>
+      </div>
+
+      <div class="bg-white p-4 rounded-xl flex flex-col items-center justify-center space-y-2">
+        <div class="w-52 h-52 bg-zinc-100 rounded-lg flex flex-col items-center justify-center border-4 border-dashed border-red-600 relative p-2">
+          <img src="https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=SREYMARA_ACLEDA_10371231" alt="ACLEDA KHQR Code" class="w-full h-full object-contain">
+        </div>
+        <p class="text-[10px] text-black font-semibold text-center mt-1">Scan with any <span class="font-bold">Bakong, ABA, ACLEDA, Wing</span> or KHQR app</p>
+      </div>
+
+      <div class="space-y-1 text-xs font-mono border-t border-gray-800 pt-3">
+        <div class="flex justify-between">
+          <span class="text-gray-400">Settlement Account:</span>
+          <span class="text-luxuryGold font-bold">ACLEDA 10371231</span>
+        </div>
+        <div class="flex justify-between">
+          <span class="text-gray-400">Verified Holder:</span>
+          <span class="text-white">N******* P******* C*********</span>
+        </div>
+      </div>
+
+      <a href="https://bakong.nbc.gov.kh" target="_blank" class="block w-full text-center bg-zinc-800 hover:bg-zinc-700 text-accentCyan text-xs font-bold py-2 rounded-xl border border-zinc-700">
+        🔗 Open Directly in ACLEDA / Bakong App
+      </a>
+    </div>
+
+    <!-- PROOF FORM -->
+    <div class="bg-darkCard p-4 rounded-2xl border border-gray-800 space-y-3 max-w-sm mx-auto">
+      <span class="text-xs font-bold text-white">🔍 Real-Time Verification / Test Credit:</span>
+      <input type="text" id="store-tx-id" placeholder="Enter Bank Tx ID / Ref (e.g. ACL-984210)" class="w-full bg-cyberBlack border border-gray-700 rounded-xl p-2.5 text-xs text-white font-mono">
+      
+      <div class="grid grid-cols-2 gap-2">
+        <button id="btn-verify-deposit" class="bg-luxuryGold hover:bg-luxuryGoldHover text-black text-xs font-extrabold py-2.5 rounded-xl transition">
+          ⚡ VERIFY & CREDIT
+        </button>
+        <button id="btn-simulate-deposit" class="bg-accentCyan/10 hover:bg-accentCyan/20 text-accentCyan border border-accentCyan/30 text-xs font-bold py-2.5 rounded-xl transition">
+          🧪 SIMULATE TEST
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- EMBEDDED JAVASCRIPT ENGINE -->
+  <script>
+    const state = {
+      sreymaraBalance: parseFloat(localStorage.getItem('sm_bal') || '1250000.00'),
+      nellyBalance: parseFloat(localStorage.getItem('nelly_bal') || '45820.00'),
+      lastClaim: parseInt(localStorage.getItem('sm_last_claim') || '0'),
+      selectedUsd: 1
+    };
+
+    document.addEventListener('DOMContentLoaded', () => {
+      updateBalances();
+      bindEvents();
+    });
+
+    function updateBalances() {
+      const smEl = document.getElementById('sreymara-balance');
+      const nellyEl = document.getElementById('nelly-balance');
+      
+      if (smEl) smEl.innerText = state.sreymaraBalance.toLocaleString('en-US', { minimumFractionDigits: 2 });
+      if (nellyEl) nellyEl.innerText = state.nellyBalance.toLocaleString('en-US', { minimumFractionDigits: 2 });
+      
+      localStorage.setItem('sm_bal', state.sreymaraBalance.toFixed(2));
+      localStorage.setItem('nelly_bal', state.nellyBalance.toFixed(2));
+    }
+
+    function showToast(message, duration = 3000) {
+      const container = document.getElementById('toast-container');
+      if (!container) return;
+
+      const toast = document.createElement('div');
+      toast.className = 'mt-2 px-4 py-3 bg-zinc-900 border border-luxuryGold/30 text-white rounded-xl shadow-2xl text-xs font-semibold flex items-center gap-2 transform transition-all duration-300 translate-y-2 opacity-0';
+      toast.innerHTML = `<span>✨</span> <span>${message}</span>`;
+      
+      container.appendChild(toast);
+      setTimeout(() => toast.classList.remove('translate-y-2', 'opacity-0'), 10);
+      setTimeout(() => {
+        toast.classList.add('translate-y-2', 'opacity-0');
+        setTimeout(() => toast.remove(), 300);
+      }, duration);
+    }
+
+    function switchView(viewId) {
+      const dashboard = document.getElementById('view-dashboard');
+      const cinema = document.getElementById('view-cinema');
+      const social = document.getElementById('view-social');
+
+      if (dashboard) dashboard.classList.add('hidden');
+      if (cinema) cinema.classList.add('hidden');
+      if (social) social.classList.add('hidden');
+
+      const activeView = document.getElementById(`view-${viewId}`);
+      if (activeView) activeView.classList.remove('hidden');
+    }
+
+    function openFullStorePage() {
+      document.getElementById('main-hub-wrapper')?.classList.add('hidden');
+      document.getElementById('app-header')?.classList.add('hidden');
+      document.getElementById('full-store-page')?.classList.remove('hidden');
+    }
+
+    function closeFullStorePage() {
+      document.getElementById('full-store-page')?.classList.add('hidden');
+      document.getElementById('main-hub-wrapper')?.classList.remove('hidden');
+      document.getElementById('app-header')?.classList.remove('hidden');
+    }
+
+    function selectPackage(usd) {
+      state.selectedUsd = usd;
+      document.querySelectorAll('.pkg-btn').forEach(btn => btn.classList.replace('border-luxuryGold', 'border-transparent'));
+      const activeBtn = document.getElementById(`pkg-${usd}`);
+      if (activeBtn) activeBtn.classList.replace('border-transparent', 'border-luxuryGold');
+      showToast(`Selected Package: $${usd}.00 USD`);
+    }
+
+    function verifyStoreDeposit() {
+      const txInput = document.getElementById('store-tx-id');
+      const tx = txInput ? txInput.value : '';
+      if (!tx || tx.length < 4) {
+        showToast("⚠️ Please enter a valid Transaction ID / Reference!");
+        return;
+      }
+      showToast("🔍 Validating ACLEDA Bank Proof...");
+      setTimeout(() => {
+        state.sreymaraBalance += state.selectedUsd * 50000;
+        updateBalances();
+        showToast(`✅ Deposit Verified! Added ${state.selectedUsd * 50000} $SREYMARA!`);
+      }, 1500);
+    }
+
+    function simulateTestDeposit() {
+      state.sreymaraBalance += 50000;
+      updateBalances();
+      showToast("🧪 Test Credit Applied: +50,000 $SREYMARA!");
+    }
+
+    function claimTokens() {
+      const now = Date.now();
+      if (now - state.lastClaim < 3600000) {
+        showToast("⏳ Cooling down! Please wait for hourly reset.");
+        return;
+      }
+      state.sreymaraBalance += 1000;
+      state.lastClaim = now;
+      localStorage.setItem('sm_last_claim', now.toString());
+      updateBalances();
+      showToast("🎁 Claimed 1,000 $SREYMARA Tokens!");
+    }
+
+    function triggerAdNetworkReward() {
+      showToast("⚡ Querying Ad Network...");
+      setTimeout(() => {
+        state.sreymaraBalance += 500;
+        updateBalances();
+        showToast("✅ Ad Watched! +500 $SREYMARA");
+      }, 1200);
+    }
+
+    function bindEvents() {
+      document.getElementById('nav-hub')?.addEventListener('click', () => switchView('dashboard'));
+      document.getElementById('nav-cinema')?.addEventListener('click', () => switchView('cinema'));
+      document.getElementById('nav-palace')?.addEventListener('click', () => switchView('social'));
+
+      document.getElementById('btn-open-store-header')?.addEventListener('click', openFullStorePage);
+      document.getElementById('btn-open-store-hero')?.addEventListener('click', openFullStorePage);
+      document.getElementById('btn-close-store')?.addEventListener('click', closeFullStorePage);
+
+      document.getElementById('pkg-1')?.addEventListener('click', () => selectPackage(1));
+      document.getElementById('pkg-5')?.addEventListener('click', () => selectPackage(5));
+      document.getElementById('pkg-20')?.addEventListener('click', () => selectPackage(20));
+
+      document.getElementById('btn-verify-deposit')?.addEventListener('click', verifyStoreDeposit);
+      document.getElementById('btn-simulate-deposit')?.addEventListener('click', simulateTestDeposit);
+
+      document.getElementById('btn-claim')?.addEventListener('click', claimTokens);
+      document.getElementById('btn-ad-reward')?.addEventListener('click', triggerAdNetworkReward);
+
+      document.getElementById('btn-verify-tg')?.addEventListener('click', () => {
+        state.sreymaraBalance += 5000;
+        updateBalances();
+        showToast("✅ Task Approved! +5,000 $SREYMARA!");
+      });
+
+      document.getElementById('wallet-address')?.addEventListener('click', () => {
+        navigator.clipboard.writeText("Sol3vF9R4KzQ6Z6z6fC45820SREYMARASAFEPOT");
+        showToast("📋 Safe Pot Address Copied!");
+      });
+    }
+  </script>
+</body>
+</html>

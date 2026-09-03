@@ -1,0 +1,3 @@
+WindowManager: WINDOW DIED Window{...}
+WindowManager: Exception thrown during dispatchAppVisibility ... DeadObjectException
+InputDispatcher: Consumer closed input channel or an error occurred

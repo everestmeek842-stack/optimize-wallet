@@ -1,0 +1,2 @@
+ActivityManager: Start proc 17149:com.aistudio.telegramminiapp.kxmpzq/u0a221 for next-top-activity
+ActivityTaskManager: Displayed com.aistudio.telegramminiapp.kxmpzq/com.example.MainActivity for user 0: +1s446ms

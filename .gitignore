@@ -1,0 +1,12 @@
+.DS_Store
+*.local
+.env
+*.key
+node_modules/
+build_outputs/
+android/.gradle/
+android/build/
+android/app/build/
+android/local.properties
+android/.jdk17/
+*.bak*
