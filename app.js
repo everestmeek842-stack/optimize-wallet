@@ -1,6 +1,20 @@
 const STORAGE_KEY = "nexus-ai-workspace-v1";
 const SESSION_KEYS = "nexus-ai-session-keys-v1";
 
+const DESKTOP_MATRIX_APPS = [
+  ['volume', '🔊', 'Audio Control'], ['security', '🛡️', 'Security Core'], ['usb', '🔌', 'USB Mount'], ['firewall', '⚠️', 'Firewall Alert'], ['bluetooth', 'ᛒ', 'Bluetooth'],
+  ['design', '🖊️', 'Design Tool'], ['cloud', '☁️', 'Cloud Storage'], ['analytics', '📊', 'Analytics'], ['telegram', '✈️', 'Telegram'], ['identity', '🧑', 'Identity Engine'],
+  ['tasks', '✅', 'Tasks'], ['onenote', '📓', 'Notes Engine'], ['network', '🖥️', 'Network Monitor'], ['ai-assistant', '✦', 'AI Assistant'], ['chainlink', '🔗', 'Chainlink Oracle'],
+  ['notion', 'N', 'Notion Hub'], ['broadcast', '📡', 'Broadcast Engine'], ['settings', '⚙️', 'Settings'], ['chatgpt', '◉', 'ChatGPT Hub'], ['rox-engine', '⚙', 'ROX Engine'],
+  ['whatsapp', '◔', 'WhatsApp Web'], ['github', '●', 'GitHub / GigHog'], ['tiktok', '♪', 'TikTok Hub'], ['facebook', 'f', 'Facebook Portal'], ['instagram', '◎', 'Instagram Portal'],
+];
+
+const DESKTOP_MATRIX_URLS = {
+  telegram: 'https://web.telegram.org/', whatsapp: 'https://web.whatsapp.com/', github: 'https://github.com/',
+  tiktok: 'https://www.tiktok.com/', facebook: 'https://www.facebook.com/', instagram: 'https://www.instagram.com/',
+  chatgpt: 'https://chatgpt.com/', notion: 'https://www.notion.so/', cloud: 'https://drive.google.com/',
+};
+
 window.nexusApiUrl = (path) => {
   const base = (window.NEXUS_API_BASE || window.location.origin).replace(/\/$/, "");
   return `${base}${path.startsWith("/") ? path : `/${path}`}`;
@@ -593,7 +607,72 @@ document.querySelector("#opt-floating-ai")?.addEventListener("click", () => emit
 document.querySelector("#openBrowserButton").addEventListener("click", () => togglePanel(elements.browserPanel, true));
 document.querySelector("#closeBrowserButton").addEventListener("click", () => togglePanel(elements.browserPanel, false));
 document.querySelector("#openSidebarButton").addEventListener("click", () => togglePanel(elements.sidebar, true));
-document.querySelector("#openExplorerButton")?.addEventListener("click", () => { window.location.href = "/explorer"; });
+function initialiseDesktopMatrix() {
+  const module = document.querySelector('#desktop-matrix-module');
+  const grid = document.querySelector('#desktopMatrixGrid');
+  const viewport = document.querySelector('#desktopMatrixViewport');
+  const frame = document.querySelector('#desktopMatrixFrame');
+  const note = document.querySelector('#desktopMatrixNote');
+  const title = document.querySelector('#desktopMatrixTitle');
+  if (!module || !grid || !viewport || !frame || !note || !title) return;
+
+  grid.innerHTML = DESKTOP_MATRIX_APPS.map(([id, icon, label]) => `
+    <button class="desktop-matrix-app" type="button" data-app-id="${id}" aria-label="Open ${label}">
+      <span class="desktop-matrix-icon" aria-hidden="true">${icon}</span><span class="desktop-matrix-label">${label}</span>
+    </button>
+  `).join('');
+
+  const closeViewport = () => {
+    viewport.classList.remove('is-open');
+    viewport.setAttribute('aria-hidden', 'true');
+    frame.src = 'about:blank';
+    frame.hidden = true;
+    note.hidden = false;
+  };
+  const openApp = (appId) => {
+    const app = DESKTOP_MATRIX_APPS.find(([id]) => id === appId);
+    if (!app) return;
+    title.textContent = app[2];
+    viewport.classList.add('is-open');
+    viewport.setAttribute('aria-hidden', 'false');
+    const url = DESKTOP_MATRIX_URLS[appId];
+    if (url) {
+      frame.src = url;
+      frame.hidden = false;
+      note.hidden = true;
+    } else {
+      note.textContent = `${app[2]} is represented in the matrix. Connect its official integration before opening it here.`;
+      note.hidden = false;
+      frame.hidden = true;
+    }
+  };
+
+  grid.addEventListener('click', (event) => openApp(event.target.closest('[data-app-id]')?.dataset.appId));
+  document.querySelector('#openExplorerButton')?.addEventListener('click', () => {
+    module.classList.add('is-open');
+    module.setAttribute('aria-hidden', 'false');
+  });
+  document.querySelector('#closeDesktopMatrixButton')?.addEventListener('click', () => {
+    closeViewport();
+    module.classList.remove('is-open');
+    module.setAttribute('aria-hidden', 'true');
+  });
+  document.querySelector('#closeDesktopAppButton')?.addEventListener('click', closeViewport);
+
+  const viewToggle = document.querySelector('#desktopMatrixViewToggle');
+  const clock = document.querySelector('#desktopMatrixClock');
+  let viewMode = 0;
+  viewToggle?.addEventListener('click', () => {
+    viewMode = (viewMode + 1) % 3;
+    module.dataset.viewMode = ['standard', 'plasma-wide', 'searchlight'][viewMode];
+    viewToggle.textContent = ['Standard View', 'Plasma Wide', 'Searchlight'][viewMode];
+  });
+  const updateClock = () => { if (clock) clock.textContent = `NET: ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`; };
+  updateClock();
+  setInterval(updateClock, 30000);
+}
+
+initialiseDesktopMatrix();
 document.querySelector("#closeSidebarButton").addEventListener("click", () => togglePanel(elements.sidebar, false));
 elements.scrim.addEventListener("click", () => { togglePanel(elements.browserPanel, false); togglePanel(elements.sidebar, false); });
 

@@ -1196,6 +1196,88 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
   box-shadow: 0 0 15px rgba(212, 175, 55, 0.35);
 }
 
+#desktop-matrix-module {
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  width: 100vw;
+  height: 100vh;
+  overflow: auto;
+  background: #0a0a0f;
+  color: var(--text);
+}
+#desktop-matrix-module.is-open { display: flex; flex-direction: column; }
+#desktop-matrix-module[data-view-mode="plasma-wide"] { background: radial-gradient(circle at 50% 20%, rgba(25, 72, 75, 0.42), #050509 70%); }
+#desktop-matrix-module[data-view-mode="plasma-wide"] .desktop-matrix-grid { width: min(1320px, 100%); grid-template-columns: repeat(5, minmax(130px, 1fr)); gap: 28px; }
+#desktop-matrix-module[data-view-mode="searchlight"] .desktop-matrix-app { border-color: rgba(139, 183, 255, 0.65); box-shadow: 0 0 18px rgba(139, 183, 255, 0.18); }
+.desktop-matrix-header {
+  min-height: 56px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 10px 16px;
+  border-bottom: 1px solid rgba(46, 204, 113, 0.3);
+  background: rgba(15, 15, 26, 0.96);
+}
+.desktop-matrix-status { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.desktop-matrix-status strong {
+  padding: 6px 9px;
+  color: #2ecc71;
+  border: 1px solid rgba(46, 204, 113, 0.5);
+  background: rgba(46, 204, 113, 0.12);
+  font: 700 11px/1.2 ui-monospace, SFMono-Regular, Consolas, monospace;
+  white-space: nowrap;
+}
+.desktop-matrix-ticker { color: var(--muted); font: 12px ui-monospace, SFMono-Regular, Consolas, monospace; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.desktop-matrix-exit { padding: 8px 12px; border: 1px solid rgba(255, 127, 127, 0.55); border-radius: 6px; color: #ffd7d7; background: rgba(255, 127, 127, 0.12); white-space: nowrap; }
+.desktop-matrix-grid {
+  width: min(1100px, 100%);
+  margin: 0 auto;
+  padding: clamp(18px, 4vw, 42px);
+  display: grid;
+  grid-template-columns: repeat(5, minmax(110px, 1fr));
+  gap: clamp(12px, 2vw, 24px);
+}
+.desktop-matrix-app {
+  min-height: 112px;
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 10px;
+  color: var(--text);
+  background: rgba(255,255,255,0.05);
+  transition: transform 0.2s ease, border-color 0.2s ease, background 0.2s ease;
+}
+.desktop-matrix-app:hover, .desktop-matrix-app:focus-visible { transform: translateY(-3px); border-color: var(--accent); background: rgba(212,175,55,0.12); }
+.desktop-matrix-icon { font-size: 30px; line-height: 1; }
+.desktop-matrix-label { font-size: 12px; font-weight: 700; text-align: center; }
+.desktop-matrix-viewport {
+  display: none;
+  position: fixed;
+  inset: 70px 18px 18px;
+  z-index: 10000;
+  flex-direction: column;
+  border: 1px solid var(--glass-border);
+  border-radius: 10px;
+  overflow: hidden;
+  background: #050509;
+}
+.desktop-matrix-viewport.is-open { display: flex; }
+.desktop-matrix-viewport-bar { display: flex; justify-content: space-between; gap: 10px; padding: 10px 12px; background: #151522; }
+.desktop-matrix-viewport iframe { width: 100%; height: 100%; border: 0; background: #fff; }
+.desktop-matrix-note { margin: auto; max-width: 520px; padding: 24px; color: var(--muted); text-align: center; }
+@media (max-width: 700px) {
+  .desktop-matrix-grid { grid-template-columns: repeat(3, minmax(84px, 1fr)); padding: 16px; gap: 10px; }
+  .desktop-matrix-app { min-height: 92px; }
+  .desktop-matrix-ticker { display: none; }
+  .desktop-matrix-viewport { inset: 62px 8px 8px; }
+}
+
 #opt-browser-workspace {
   position: fixed;
   top: 60px;
@@ -1898,6 +1980,29 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
         <iframe id="browser-iframe" src="about:blank" sandbox="allow-scripts allow-same-origin allow-forms allow-popups"></iframe>
     </div>
 </div>
+<!-- Isolated desktop matrix: hidden until opened from the grid launcher -->
+<section id="desktop-matrix-module" aria-hidden="true" aria-label="Desktop app matrix">
+  <header class="desktop-matrix-header">
+    <div class="desktop-matrix-status">
+      <strong>STATUS: CHECK BUILD... [371x429]</strong>
+      <span class="desktop-matrix-ticker">System Nominal | Dual Pipeline Active | Supabase persistence</span>
+    </div>
+    <div style="display:flex;align-items:center;gap:8px;">
+      <span class="desktop-matrix-ticker" id="desktopMatrixClock">NET: --:--</span>
+      <button class="desktop-matrix-exit" id="desktopMatrixViewToggle" type="button">Standard View</button>
+      <button class="desktop-matrix-exit" id="closeDesktopMatrixButton" type="button">Return to Main Hub</button>
+    </div>
+  </header>
+  <main class="desktop-matrix-grid" id="desktopMatrixGrid"></main>
+  <section class="desktop-matrix-viewport" id="desktopMatrixViewport" aria-hidden="true">
+    <div class="desktop-matrix-viewport-bar">
+      <strong id="desktopMatrixTitle">Application Viewport</strong>
+      <button class="desktop-matrix-exit" id="closeDesktopAppButton" type="button">Close</button>
+    </div>
+    <div class="desktop-matrix-note" id="desktopMatrixNote">Some services block embedded views for security. Use their official app or site when embedding is unavailable.</div>
+    <iframe id="desktopMatrixFrame" title="Embedded application view" hidden></iframe>
+  </section>
+</section>
 <!-- Optimize: AI Assistant & Writer Modal -->
 <div id="opt-ai-modal" class="opt-component opt-hidden">
     <div class="opt-ai-content">
