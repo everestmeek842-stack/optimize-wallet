@@ -100,6 +100,7 @@ class ExplorerWorkspace {
         document.getElementById('serverRegion')?.addEventListener('change', (e) => this.switchServer(e.target.value));
         document.getElementById('testConnectionBtn')?.addEventListener('click', () => this.testConnection());
         document.getElementById('stateSwitcher')?.addEventListener('click', () => this.showStateSelector());
+        document.getElementById('backToWorkspaceBtn')?.addEventListener('click', () => { window.location.href = '/'; });
     }
 
     switchTab(tabName) {

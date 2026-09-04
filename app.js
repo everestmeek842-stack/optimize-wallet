@@ -593,6 +593,7 @@ document.querySelector("#opt-floating-ai")?.addEventListener("click", () => emit
 document.querySelector("#openBrowserButton").addEventListener("click", () => togglePanel(elements.browserPanel, true));
 document.querySelector("#closeBrowserButton").addEventListener("click", () => togglePanel(elements.browserPanel, false));
 document.querySelector("#openSidebarButton").addEventListener("click", () => togglePanel(elements.sidebar, true));
+document.querySelector("#openExplorerButton")?.addEventListener("click", () => { window.location.href = "/explorer"; });
 document.querySelector("#closeSidebarButton").addEventListener("click", () => togglePanel(elements.sidebar, false));
 elements.scrim.addEventListener("click", () => { togglePanel(elements.browserPanel, false); togglePanel(elements.sidebar, false); });
 
