@@ -613,6 +613,7 @@ function initialiseDesktopMatrix() {
   const viewport = document.querySelector('#desktopMatrixViewport');
   const frame = document.querySelector('#desktopMatrixFrame');
   const note = document.querySelector('#desktopMatrixNote');
+  const popupButton = document.querySelector('#desktopMatrixPopupButton');
   const title = document.querySelector('#desktopMatrixTitle');
   if (!module || !grid || !viewport || !frame || !note || !title) return;
 
@@ -628,6 +629,7 @@ function initialiseDesktopMatrix() {
     frame.src = 'about:blank';
     frame.hidden = true;
     note.hidden = false;
+    if (popupButton) popupButton.hidden = true;
   };
   const openApp = (appId) => {
     const app = DESKTOP_MATRIX_APPS.find(([id]) => id === appId);
@@ -637,9 +639,20 @@ function initialiseDesktopMatrix() {
     viewport.setAttribute('aria-hidden', 'false');
     const url = DESKTOP_MATRIX_URLS[appId];
     if (url) {
-      frame.src = url;
+      frame.src = `${window.nexusApiUrl(`/api/standalone-proxy/${appId}`)}`;
       frame.hidden = false;
       note.hidden = true;
+      if (popupButton) {
+        popupButton.hidden = false;
+        popupButton.onclick = () => window.open(url, `${appId}-official`, 'popup,width=1200,height=800,noopener,noreferrer');
+      }
+      window.setTimeout(() => {
+        if (viewport.classList.contains('is-open') && frame.src !== 'about:blank') {
+          note.textContent = 'This service may block embedded access. Open the official site in a secure window to continue.';
+          note.hidden = false;
+          if (popupButton) popupButton.hidden = false;
+        }
+      }, 3500);
     } else {
       note.textContent = `${app[2]} is represented in the matrix. Connect its official integration before opening it here.`;
       note.hidden = false;

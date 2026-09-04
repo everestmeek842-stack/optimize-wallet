@@ -5,6 +5,7 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 const { createClient } = require('@supabase/supabase-js');
+const { createProxyMiddleware } = require('http-proxy-middleware');
 
 dotenv.config();
 
@@ -106,6 +107,43 @@ const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
 const supabase = supabaseUrl && supabaseAnonKey ? createClient(supabaseUrl, supabaseAnonKey) : null;
 const supabaseAdmin = supabaseUrl && supabaseServiceKey ? createClient(supabaseUrl, supabaseServiceKey) : null;
+
+const standaloneProxyTargets = {
+  telegram: 'https://web.telegram.org',
+  whatsapp: 'https://web.whatsapp.com',
+  github: 'https://github.com',
+  tiktok: 'https://www.tiktok.com',
+  facebook: 'https://www.facebook.com',
+  instagram: 'https://www.instagram.com',
+  chatgpt: 'https://chatgpt.com',
+  notion: 'https://www.notion.so',
+  cloud: 'https://drive.google.com',
+};
+
+app.use('/api/standalone-proxy/:targetApp', (req, res, next) => {
+  if (!standaloneProxyTargets[req.params.targetApp]) {
+    return res.status(400).json({ ok: false, error: 'Unsupported embedded application.' });
+  }
+  next();
+});
+
+app.use('/api/standalone-proxy/:targetApp', createProxyMiddleware({
+  changeOrigin: true,
+  router: (req) => standaloneProxyTargets[req.params.targetApp],
+  pathRewrite: (path, req) => path.replace(`/api/standalone-proxy/${req.params.targetApp}`, '') || '/',
+  on: {
+    proxyReq: (proxyReq) => {
+      proxyReq.removeHeader('authorization');
+      proxyReq.removeHeader('cookie');
+    },
+    proxyRes: (proxyRes) => {
+      proxyRes.headers['x-nexus-proxy'] = 'public-content-only';
+    },
+  },
+  onError: (error, req, res) => {
+    if (!res.headersSent) res.status(502).json({ ok: false, error: 'The target application does not allow embedded access.' });
+  },
+}));
 
 async function verifySupabaseConnection() {
   if (!supabase) {
