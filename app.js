@@ -1,6 +1,11 @@
 const STORAGE_KEY = "nexus-ai-workspace-v1";
 const SESSION_KEYS = "nexus-ai-session-keys-v1";
 
+window.nexusApiUrl = (path) => {
+  const base = (window.NEXUS_API_BASE || window.location.origin).replace(/\/$/, "");
+  return `${base}${path.startsWith("/") ? path : `/${path}`}`;
+};
+
 const defaultState = {
   chats: [],
   currentChatId: null,
@@ -718,6 +723,28 @@ render();
         // Nelli's TV Player with Reward Tracking
         const vid = document.getElementById('nelly-video');
         const chBtns = document.querySelectorAll('.opt-ch-btn');
+        let audioUnlocked = false;
+
+        const rampAudio = () => {
+          if (!vid || audioUnlocked) return;
+          audioUnlocked = true;
+          vid.muted = false;
+          vid.volume = 0;
+          const ramp = setInterval(() => {
+            vid.volume = Math.min(1, vid.volume + 0.1);
+            if (vid.volume >= 1) clearInterval(ramp);
+          }, 120);
+        };
+
+        if (vid) {
+          vid.muted = true;
+          vid.volume = 0;
+          ['click', 'touchstart', 'keydown'].forEach((eventName) => {
+            vid.addEventListener(eventName, rampAudio, { once: true });
+          });
+          vid.play().catch(() => {});
+        }
+
         if (chBtns.length) {
             chBtns.forEach(b => {
                 b.addEventListener('click', () => {
@@ -725,6 +752,7 @@ render();
                     b.classList.add('active');
                     if (vid && b.dataset.src) {
                         vid.src = b.dataset.src;
+                        vid.muted = !audioUnlocked;
                         vid.play().catch(() => {});
                         
                         // Select channel action - show ad before reward

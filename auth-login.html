@@ -201,7 +201,8 @@
       }
 
       async function apiRequest(path, payload) {
-        const response = await fetch(path, {
+        const apiBase = (window.NEXUS_API_BASE || window.location.origin).replace(/\/$/, '');
+        const response = await fetch(`${apiBase}${path.startsWith('/') ? path : `/${path}`}`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           credentials: 'include',

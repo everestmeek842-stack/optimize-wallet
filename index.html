@@ -2183,7 +2183,7 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
     };
     
     // Send to analytics endpoint
-    fetch('/api/track-monetization', {
+    fetch(window.nexusApiUrl('/api/track-monetization'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
