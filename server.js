@@ -107,6 +107,29 @@ const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const supabase = supabaseUrl && supabaseAnonKey ? createClient(supabaseUrl, supabaseAnonKey) : null;
 const supabaseAdmin = supabaseUrl && supabaseServiceKey ? createClient(supabaseUrl, supabaseServiceKey) : null;
 
+async function verifySupabaseConnection() {
+  if (!supabase) {
+    console.warn('[Supabase] Not configured. Set SUPABASE_URL and SUPABASE_ANON_KEY in .env.');
+    return false;
+  }
+
+  try {
+    const query = supabase.from('users').select('count', { count: 'exact', head: true });
+    const result = await Promise.race([
+      query,
+      new Promise((_, reject) => setTimeout(() => reject(new Error('Health query timed out')), 10000))
+    ]);
+
+    if (result.error) throw result.error;
+    console.log('✅ [Supabase] Connected successfully to live database');
+    return true;
+  } catch (error) {
+    const message = error && error.message ? error.message : 'Unable to reach Supabase or query the users table.';
+    console.warn(`[Supabase] Connection verification failed: ${message}`);
+    return false;
+  }
+}
+
 const baseMetrics = {
   ads: 128.4,
   cinema: 356.1,
@@ -142,7 +165,11 @@ function normaliseWallet(value) {
   return String(value).trim();
 }
 
-function startServer(port) {
+async function startServer(port) {
+  await verifySupabaseConnection();
+  console.log('Local Frontend: http://localhost:8000');
+  console.log(`Local Backend API: http://localhost:${port}`);
+
   const server = app.listen(port, () => {
     console.log(`Nexus backend listening on http://localhost:${port}`);
   });
