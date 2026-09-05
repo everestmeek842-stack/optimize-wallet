@@ -801,11 +801,14 @@ render();
         const btnApp = document.getElementById('btn-app-view');
         const btnWeb = document.getElementById('btn-web-view');
         const ws = document.getElementById('opt-browser-workspace');
+        const browserFrame = document.getElementById('browser-iframe');
+        const browserNotice = document.getElementById('browser-stream-notice');
         if (btnApp && btnWeb && ws) {
             btnApp.addEventListener('click', () => {
                 btnApp.classList.add('active');
                 btnWeb.classList.remove('active');
                 ws.classList.add('opt-hidden');
+            if (browserNotice) browserNotice.hidden = true;
             });
             btnWeb.addEventListener('click', () => {
                 btnWeb.classList.add('active');
@@ -815,13 +818,51 @@ render();
                 if (ifr && (ifr.src === 'about:blank' || ifr.src === '')) {
                     ifr.src = 'https://earnings.ink';
                 }
+            if (browserNotice) {
+              browserNotice.hidden = false;
+              browserNotice.textContent = 'External cinema loaded. If its manifest fails, use App View for the stable built-in player.';
+            }
             });
         }
 
         // Nelli's TV Player with Reward Tracking
         const vid = document.getElementById('nelly-video');
         const chBtns = document.querySelectorAll('.opt-ch-btn');
+        const videoStatus = document.getElementById('nelly-video-status');
+        let hls = null;
         let audioUnlocked = false;
+
+        const setVideoStatus = (message, isError = false) => {
+          if (!videoStatus) return;
+          videoStatus.textContent = message;
+          videoStatus.classList.toggle('is-error', isError);
+        };
+
+        const loadVideoSource = (source) => {
+          if (!vid) return;
+          if (hls) {
+            hls.destroy();
+            hls = null;
+          }
+          setVideoStatus('Loading cinema stream...');
+          if (/\.m3u8(?:$|\?)/i.test(source) && window.Hls?.isSupported()) {
+            hls = new window.Hls({ enableWorker: true, lowLatencyMode: true, backBufferLength: 30 });
+            hls.on(window.Hls.Events.MANIFEST_PARSED, () => setVideoStatus('Live stream ready'));
+            hls.on(window.Hls.Events.ERROR, (_event, data) => {
+              if (!data?.fatal) return;
+              setVideoStatus('Stream unavailable. Select another channel or retry later.', true);
+              hls.destroy();
+              hls = null;
+            });
+            hls.loadSource(source);
+            hls.attachMedia(vid);
+          } else {
+            vid.src = source;
+            vid.addEventListener('loadedmetadata', () => setVideoStatus('Stream ready'), { once: true });
+            vid.addEventListener('error', () => setVideoStatus('Stream unavailable. Select another channel or retry later.', true), { once: true });
+          }
+          vid.play().catch(() => {});
+        };
 
         const rampAudio = () => {
           if (!vid || audioUnlocked) return;
@@ -840,7 +881,7 @@ render();
           ['click', 'touchstart', 'keydown'].forEach((eventName) => {
             vid.addEventListener(eventName, rampAudio, { once: true });
           });
-          vid.play().catch(() => {});
+          loadVideoSource(vid.querySelector('source')?.src || 'https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8');
         }
 
         if (chBtns.length) {
@@ -849,9 +890,8 @@ render();
                     chBtns.forEach(x => x.classList.remove('active'));
                     b.classList.add('active');
                     if (vid && b.dataset.src) {
-                        vid.src = b.dataset.src;
+                      loadVideoSource(b.dataset.src);
                         vid.muted = !audioUnlocked;
-                        vid.play().catch(() => {});
                         
                         // Select channel action - show ad before reward
                         showTelegramAd().then(() => {
