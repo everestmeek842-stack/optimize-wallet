@@ -12,8 +12,10 @@ dotenv.config();
 const app = express();
 const port = process.env.PORT || 8000;
 const USERS_FILE = path.join(__dirname, 'data', 'users.json');
+const API_KEYS_FILE = path.join(__dirname, 'data', 'api-keys.json');
 const SESSION_TTL_MS = 1000 * 60 * 60 * 24 * 7;
 const sessions = {};
+const API_KEY_SCOPES = new Set(['reader', 'transactions:read', 'transactions:write', 'keys:manage']);
 
 function ensureUserStore() {
   const dir = path.dirname(USERS_FILE);
@@ -35,6 +37,71 @@ function readUsers() {
 function writeUsers(users) {
   ensureUserStore();
   fs.writeFileSync(USERS_FILE, JSON.stringify(users, null, 2));
+}
+
+function readApiKeys() {
+  try {
+    return JSON.parse(fs.readFileSync(API_KEYS_FILE, 'utf8'));
+  } catch (error) {
+    return {};
+  }
+}
+
+function writeApiKeys(apiKeys) {
+  const dir = path.dirname(API_KEYS_FILE);
+  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+  fs.writeFileSync(API_KEYS_FILE, JSON.stringify(apiKeys, null, 2));
+}
+
+function hashApiKey(secret) {
+  const pepper = process.env.API_KEY_PEPPER || process.env.SESSION_SECRET;
+  if (!pepper) throw new Error('API_KEY_PEPPER must be configured before issuing API keys.');
+  return crypto.createHmac('sha256', pepper).update(secret).digest('hex');
+}
+
+function safeSecretMatch(left, right) {
+  const leftBuffer = Buffer.from(left);
+  const rightBuffer = Buffer.from(right);
+  return leftBuffer.length === rightBuffer.length && crypto.timingSafeEqual(leftBuffer, rightBuffer);
+}
+
+function hasApiScope(key, scope) {
+  return key.scopes.includes(scope) || key.scopes.includes('keys:manage');
+}
+
+function requireApiScope(scope) {
+  return (req, res, next) => {
+    const authorization = String(req.headers.authorization || '');
+    const secret = authorization.startsWith('Bearer ') ? authorization.slice(7).trim() : String(req.headers['x-api-key'] || '').trim();
+    if (!secret) return res.status(401).json({ ok: false, error: 'API key required.' });
+
+    let keyHash;
+    try {
+      keyHash = hashApiKey(secret);
+    } catch (error) {
+      return res.status(503).json({ ok: false, error: 'API key signing is not configured.' });
+    }
+
+    const apiKeys = readApiKeys();
+    const key = Object.values(apiKeys).find((candidate) => safeSecretMatch(candidate.hash, keyHash));
+    if (!key || key.revokedAt || (key.expiresAt && Date.now() >= Date.parse(key.expiresAt)) || !hasApiScope(key, scope)) {
+      return res.status(403).json({ ok: false, error: 'API key is invalid, expired, revoked, or missing the required scope.' });
+    }
+
+    key.lastUsedAt = new Date().toISOString();
+    writeApiKeys(apiKeys);
+    req.apiKey = key;
+    next();
+  };
+}
+
+function requireKeyManager(req, res, next) {
+  const configuredAdminKey = process.env.ADMIN_API_KEY;
+  const suppliedAdminKey = String(req.headers['x-admin-api-key'] || '');
+  if (!configuredAdminKey || !suppliedAdminKey || !safeSecretMatch(configuredAdminKey, suppliedAdminKey)) {
+    return res.status(403).json({ ok: false, error: 'Key management requires the configured admin credential.' });
+  }
+  next();
 }
 
 function normaliseEmail(value) {
@@ -144,6 +211,80 @@ app.use('/api/standalone-proxy/:targetApp', createProxyMiddleware({
     if (!res.headersSent) res.status(502).json({ ok: false, error: 'The target application does not allow embedded access.' });
   },
 }));
+
+app.post('/api/keys', requireKeyManager, (req, res) => {
+  const payload = req.body || {};
+  const scopes = Array.isArray(payload.scopes) && payload.scopes.length ? [...new Set(payload.scopes)] : ['reader'];
+  const invalidScope = scopes.find((scope) => !API_KEY_SCOPES.has(scope));
+  if (invalidScope) return res.status(400).json({ ok: false, error: `Unsupported scope: ${invalidScope}` });
+
+  let expiresAt = null;
+  if (payload.expiresAt) {
+    const parsedExpiry = Date.parse(payload.expiresAt);
+    if (!Number.isFinite(parsedExpiry) || parsedExpiry <= Date.now()) {
+      return res.status(400).json({ ok: false, error: 'expiresAt must be a future ISO date or omitted for no expiration.' });
+    }
+    expiresAt = new Date(parsedExpiry).toISOString();
+  }
+
+  let secret;
+  try {
+    secret = `nexus_live_${crypto.randomBytes(32).toString('base64url')}`;
+    const apiKeys = readApiKeys();
+    const id = `key_${crypto.randomBytes(12).toString('hex')}`;
+    apiKeys[id] = {
+      id,
+      name: String(payload.name || 'Unnamed integration').trim().slice(0, 80),
+      hash: hashApiKey(secret),
+      scopes,
+      createdAt: new Date().toISOString(),
+      expiresAt,
+      revokedAt: null,
+      lastUsedAt: null,
+    };
+    writeApiKeys(apiKeys);
+    return res.status(201).json({
+      ok: true,
+      key: { id, name: apiKeys[id].name, secret, scopes, expiresAt, warning: 'Store this secret now. It cannot be retrieved again.' },
+    });
+  } catch (error) {
+    return res.status(503).json({ ok: false, error: error.message || 'Unable to issue API key.' });
+  }
+});
+
+app.get('/api/keys', requireKeyManager, (_req, res) => {
+  const keys = Object.values(readApiKeys()).map(({ hash, ...metadata }) => metadata);
+  res.json({ ok: true, keys });
+});
+
+app.post('/api/keys/:keyId/revoke', requireKeyManager, (req, res) => {
+  const apiKeys = readApiKeys();
+  const key = apiKeys[req.params.keyId];
+  if (!key) return res.status(404).json({ ok: false, error: 'API key not found.' });
+  if (!key.revokedAt) key.revokedAt = new Date().toISOString();
+  writeApiKeys(apiKeys);
+  res.json({ ok: true, key: { id: key.id, revokedAt: key.revokedAt } });
+});
+
+app.post('/api/transactions', requireApiScope('transactions:write'), (req, res) => {
+  const payload = req.body || {};
+  const amount = Number(payload.amount);
+  if (!Number.isFinite(amount) || amount <= 0 || amount > 1000000) {
+    return res.status(400).json({ ok: false, error: 'Transaction amount must be a positive number under 1,000,000.' });
+  }
+
+  const transaction = {
+    id: crypto.randomUUID(),
+    amount,
+    asset: String(payload.asset || 'USDT').toUpperCase(),
+    destination: String(payload.destination || '').trim(),
+    status: 'queued_for_provider_review',
+    createdAt: new Date().toISOString(),
+    apiKeyId: req.apiKey.id,
+  };
+  ledger.push({ type: 'authorized_transaction', ...transaction });
+  res.status(202).json({ ok: true, transaction, message: 'Transaction authorized and queued. No funds were transferred by this endpoint.' });
+});
 
 async function verifySupabaseConnection() {
   if (!supabase) {
