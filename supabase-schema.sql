@@ -70,6 +70,46 @@ create table if not exists app_settings (
   updated_at timestamptz default now()
 );
 
+create table if not exists api_keys (
+  id uuid primary key default gen_random_uuid(),
+  name text not null,
+  key_prefix text not null,
+  key_hash text unique not null,
+  scopes text[] not null default array['reader'],
+  expires_at timestamptz,
+  revoked_at timestamptz,
+  last_used_at timestamptz,
+  created_at timestamptz not null default now()
+);
+
+create table if not exists transaction_ledger (
+  id uuid primary key default gen_random_uuid(),
+  api_key_id uuid references api_keys(id),
+  profile_id uuid references profiles(id),
+  asset text not null default 'USDT',
+  amount numeric(24,8) not null check (amount > 0),
+  destination text not null,
+  status text not null default 'authorized',
+  provider_signature text,
+  created_at timestamptz not null default now()
+);
+
+create table if not exists monetization_ledger (
+  id uuid primary key default gen_random_uuid(),
+  profile_id uuid references profiles(id),
+  source text not null,
+  external_id text,
+  currency text not null default 'USDT',
+  gross_amount numeric(24,8) not null check (gross_amount > 0),
+  master_amount numeric(24,8) not null check (master_amount >= 0),
+  platform_amount numeric(24,8) not null check (platform_amount >= 0),
+  status text not null default 'settled',
+  created_at timestamptz not null default now()
+);
+
 create index if not exists profiles_telegram_id_idx on profiles(telegram_id);
 create index if not exists earnings_profile_id_idx on earnings(profile_id);
 create index if not exists payouts_profile_id_idx on payouts(profile_id);
+create index if not exists api_keys_hash_idx on api_keys(key_hash);
+create index if not exists transaction_ledger_api_key_idx on transaction_ledger(api_key_id);
+create index if not exists monetization_ledger_created_at_idx on monetization_ledger(created_at desc);

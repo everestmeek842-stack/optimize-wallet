@@ -6,16 +6,31 @@ const path = require('path');
 const crypto = require('crypto');
 const { createClient } = require('@supabase/supabase-js');
 const { createProxyMiddleware } = require('http-proxy-middleware');
+const rateLimit = require('express-rate-limit');
 
 dotenv.config();
 
 const app = express();
 const port = process.env.PORT || 8000;
 const USERS_FILE = path.join(__dirname, 'data', 'users.json');
-const API_KEYS_FILE = path.join(__dirname, 'data', 'api-keys.json');
 const SESSION_TTL_MS = 1000 * 60 * 60 * 24 * 7;
 const sessions = {};
-const API_KEY_SCOPES = new Set(['reader', 'transactions:read', 'transactions:write', 'keys:manage']);
+const API_KEY_SCOPES = new Set(['reader', 'transactions:read', 'transactions:write', 'earnings:read', 'partner:sync', 'keys:manage']);
+const GASFREE_PERMIT_DOMAIN = {
+  name: 'GasFreeController',
+  version: 'V1.0.0',
+  chainId: Number(process.env.TRON_CHAIN_ID_DEC || 728126428),
+  verifyingContract: process.env.GASFREE_MAINNET_VERIFYING_CONTRACT || 'TFFAMQLZybALb4uxHA9RBE7pxhUAjF3UTHQGuFzL87ZqhxkgqYEryRAd7gqFqL5rdc',
+};
+const GASFREE_PERMIT_TYPES = {
+  PermitTransfer: [
+    { name: 'token', type: 'address' }, { name: 'serviceProvider', type: 'address' },
+    { name: 'user', type: 'address' }, { name: 'receiver', type: 'address' },
+    { name: 'value', type: 'uint256' }, { name: 'maxFee', type: 'uint256' },
+    { name: 'deadline', type: 'uint256' }, { name: 'version', type: 'uint256' },
+    { name: 'nonce', type: 'uint256' },
+  ],
+};
 
 function ensureUserStore() {
   const dir = path.dirname(USERS_FILE);
@@ -39,20 +54,6 @@ function writeUsers(users) {
   fs.writeFileSync(USERS_FILE, JSON.stringify(users, null, 2));
 }
 
-function readApiKeys() {
-  try {
-    return JSON.parse(fs.readFileSync(API_KEYS_FILE, 'utf8'));
-  } catch (error) {
-    return {};
-  }
-}
-
-function writeApiKeys(apiKeys) {
-  const dir = path.dirname(API_KEYS_FILE);
-  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-  fs.writeFileSync(API_KEYS_FILE, JSON.stringify(apiKeys, null, 2));
-}
-
 function hashApiKey(secret) {
   const pepper = process.env.API_KEY_PEPPER || process.env.SESSION_SECRET;
   if (!pepper) throw new Error('API_KEY_PEPPER must be configured before issuing API keys.');
@@ -70,7 +71,7 @@ function hasApiScope(key, scope) {
 }
 
 function requireApiScope(scope) {
-  return (req, res, next) => {
+  return async (req, res, next) => {
     const authorization = String(req.headers.authorization || '');
     const secret = authorization.startsWith('Bearer ') ? authorization.slice(7).trim() : String(req.headers['x-api-key'] || '').trim();
     if (!secret) return res.status(401).json({ ok: false, error: 'API key required.' });
@@ -82,14 +83,15 @@ function requireApiScope(scope) {
       return res.status(503).json({ ok: false, error: 'API key signing is not configured.' });
     }
 
-    const apiKeys = readApiKeys();
-    const key = Object.values(apiKeys).find((candidate) => safeSecretMatch(candidate.hash, keyHash));
-    if (!key || key.revokedAt || (key.expiresAt && Date.now() >= Date.parse(key.expiresAt)) || !hasApiScope(key, scope)) {
+    if (!supabaseAdmin) return res.status(503).json({ ok: false, error: 'Supabase service role is required for API key authentication.' });
+    const { data: key, error } = await supabaseAdmin.from('api_keys').select('*').eq('key_hash', keyHash).maybeSingle();
+    if (error) return res.status(503).json({ ok: false, error: 'API key store is unavailable.' });
+    if (!key || key.revoked_at || (key.expires_at && Date.now() >= Date.parse(key.expires_at)) || !hasApiScope({ scopes: key.scopes || [] }, scope)) {
       return res.status(403).json({ ok: false, error: 'API key is invalid, expired, revoked, or missing the required scope.' });
     }
 
+    await supabaseAdmin.from('api_keys').update({ last_used_at: new Date().toISOString() }).eq('id', key.id);
     key.lastUsedAt = new Date().toISOString();
-    writeApiKeys(apiKeys);
     req.apiKey = key;
     next();
   };
@@ -164,9 +166,11 @@ function clearSessionCookie(res) {
   res.setHeader('Set-Cookie', 'sessionToken=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0');
 }
 
-app.use(cors({ origin: process.env.FRONTEND_URL || true, credentials: true }));
+const allowedOrigins = [process.env.FRONTEND_URL, process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : null].filter(Boolean);
+app.use(cors({ origin: allowedOrigins.length ? allowedOrigins : false, credentials: true }));
 app.use(express.json({ limit: '2mb' }));
 app.use(express.static(__dirname));
+app.use('/api', rateLimit({ windowMs: 60 * 1000, limit: 120, standardHeaders: 'draft-8', legacyHeaders: false }));
 
 const supabaseUrl = process.env.SUPABASE_URL;
 const supabaseAnonKey = process.env.SUPABASE_ANON_KEY;
@@ -212,7 +216,8 @@ app.use('/api/standalone-proxy/:targetApp', createProxyMiddleware({
   },
 }));
 
-app.post('/api/keys', requireKeyManager, (req, res) => {
+async function generateApiKey(req, res) {
+  if (!supabaseAdmin) return res.status(503).json({ ok: false, error: 'Supabase service role is required for API key management.' });
   const payload = req.body || {};
   const scopes = Array.isArray(payload.scopes) && payload.scopes.length ? [...new Set(payload.scopes)] : ['reader'];
   const invalidScope = scopes.find((scope) => !API_KEY_SCOPES.has(scope));
@@ -230,43 +235,52 @@ app.post('/api/keys', requireKeyManager, (req, res) => {
   let secret;
   try {
     secret = `nexus_live_${crypto.randomBytes(32).toString('base64url')}`;
-    const apiKeys = readApiKeys();
-    const id = `key_${crypto.randomBytes(12).toString('hex')}`;
-    apiKeys[id] = {
-      id,
+    const id = crypto.randomUUID();
+    const record = {
       name: String(payload.name || 'Unnamed integration').trim().slice(0, 80),
-      hash: hashApiKey(secret),
+      key_prefix: secret.slice(0, 20),
+      key_hash: hashApiKey(secret),
       scopes,
-      createdAt: new Date().toISOString(),
-      expiresAt,
-      revokedAt: null,
-      lastUsedAt: null,
+      expires_at: expiresAt,
     };
-    writeApiKeys(apiKeys);
-    return res.status(201).json({
-      ok: true,
-      key: { id, name: apiKeys[id].name, secret, scopes, expiresAt, warning: 'Store this secret now. It cannot be retrieved again.' },
-    });
+    const { data, error } = await supabaseAdmin.from('api_keys').insert({ id, ...record }).select('id,name,key_prefix,scopes,expires_at,created_at').single();
+    if (error) return res.status(503).json({ ok: false, error: 'Unable to persist API key in Supabase.' });
+    return res.status(201).json({ ok: true, key: { ...data, secret, warning: 'Store this secret now. It cannot be retrieved again.' } });
   } catch (error) {
     return res.status(503).json({ ok: false, error: error.message || 'Unable to issue API key.' });
   }
+}
+
+app.post('/api/keys', requireKeyManager, generateApiKey);
+app.post('/api/v1/keys/generate', requireKeyManager, generateApiKey);
+
+app.get('/api/keys', requireKeyManager, async (_req, res) => {
+  if (!supabaseAdmin) return res.status(503).json({ ok: false, error: 'Supabase service role is required for API key management.' });
+  const { data, error } = await supabaseAdmin.from('api_keys').select('id,name,key_prefix,scopes,expires_at,revoked_at,last_used_at,created_at').order('created_at', { ascending: false });
+  if (error) return res.status(503).json({ ok: false, error: 'Unable to read API keys from Supabase.' });
+  res.json({ ok: true, keys: data || [] });
 });
 
-app.get('/api/keys', requireKeyManager, (_req, res) => {
-  const keys = Object.values(readApiKeys()).map(({ hash, ...metadata }) => metadata);
-  res.json({ ok: true, keys });
+app.post('/api/keys/:keyId/revoke', requireKeyManager, async (req, res) => {
+  if (!supabaseAdmin) return res.status(503).json({ ok: false, error: 'Supabase service role is required for API key management.' });
+  const revokedAt = new Date().toISOString();
+  const { data, error } = await supabaseAdmin.from('api_keys').update({ revoked_at: revokedAt }).eq('id', req.params.keyId.replace(/^key_/, '')).select('id,revoked_at').maybeSingle();
+  if (error) return res.status(503).json({ ok: false, error: 'Unable to revoke API key in Supabase.' });
+  if (!data) return res.status(404).json({ ok: false, error: 'API key not found.' });
+  res.json({ ok: true, key: data });
 });
 
-app.post('/api/keys/:keyId/revoke', requireKeyManager, (req, res) => {
-  const apiKeys = readApiKeys();
-  const key = apiKeys[req.params.keyId];
-  if (!key) return res.status(404).json({ ok: false, error: 'API key not found.' });
-  if (!key.revokedAt) key.revokedAt = new Date().toISOString();
-  writeApiKeys(apiKeys);
-  res.json({ ok: true, key: { id: key.id, revokedAt: key.revokedAt } });
+app.post('/api/v1/keys/:keyId/revoke', requireKeyManager, async (req, res) => {
+  req.params.keyId = req.params.keyId.replace(/^key_/, '');
+  const revokedAt = new Date().toISOString();
+  if (!supabaseAdmin) return res.status(503).json({ ok: false, error: 'Supabase service role is required for API key management.' });
+  const { data, error } = await supabaseAdmin.from('api_keys').update({ revoked_at: revokedAt }).eq('id', req.params.keyId).select('id,revoked_at').maybeSingle();
+  if (error) return res.status(503).json({ ok: false, error: 'Unable to revoke API key in Supabase.' });
+  if (!data) return res.status(404).json({ ok: false, error: 'API key not found.' });
+  res.json({ ok: true, key: data });
 });
 
-app.post('/api/transactions', requireApiScope('transactions:write'), (req, res) => {
+app.post('/api/transactions', requireApiScope('transactions:write'), async (req, res) => {
   const payload = req.body || {};
   const amount = Number(payload.amount);
   if (!Number.isFinite(amount) || amount <= 0 || amount > 1000000) {
@@ -278,12 +292,44 @@ app.post('/api/transactions', requireApiScope('transactions:write'), (req, res) 
     amount,
     asset: String(payload.asset || 'USDT').toUpperCase(),
     destination: String(payload.destination || '').trim(),
-    status: 'queued_for_provider_review',
+    status: 'authorized',
     createdAt: new Date().toISOString(),
     apiKeyId: req.apiKey.id,
   };
-  ledger.push({ type: 'authorized_transaction', ...transaction });
-  res.status(202).json({ ok: true, transaction, message: 'Transaction authorized and queued. No funds were transferred by this endpoint.' });
+  if (!supabaseAdmin) return res.status(503).json({ ok: false, error: 'Supabase service role is required for transaction persistence.' });
+  const { data, error } = await supabaseAdmin.from('transaction_ledger').insert({ api_key_id: req.apiKey.id, amount, asset: transaction.asset, destination: transaction.destination, status: 'authorized' }).select('*').single();
+  if (error) return res.status(503).json({ ok: false, error: 'Transaction persistence failed; no payout was attempted.' });
+  res.status(201).json({ ok: true, transaction: data, message: 'Transaction recorded in Supabase. Configure a verified payout provider to settle funds.' });
+});
+
+app.post('/api/v1/payments/gasfree/permit', requireApiScope('transactions:write'), (req, res) => {
+  const message = req.body || {};
+  const requiredFields = GASFREE_PERMIT_TYPES.PermitTransfer.map((field) => field.name);
+  const missing = requiredFields.filter((field) => message[field] === undefined || message[field] === '');
+  if (missing.length) return res.status(400).json({ ok: false, error: `Missing permit fields: ${missing.join(', ')}` });
+  res.json({ ok: true, typedData: { domain: GASFREE_PERMIT_DOMAIN, types: GASFREE_PERMIT_TYPES, primaryType: 'PermitTransfer', message }, message: 'Sign this typed data with the user wallet. The server never receives private keys.' });
+});
+
+app.post('/api/v1/partner/events', requireApiScope('partner:sync'), async (req, res) => {
+  if (!supabaseAdmin) return res.status(503).json({ ok: false, error: 'Supabase service role is required for partner events.' });
+  const payload = req.body || {};
+  const amount = Number(payload.amount);
+  const currency = String(payload.currency || 'USDT').toUpperCase();
+  const source = String(payload.source || 'partner').trim().slice(0, 80);
+  const profileId = payload.profileId || null;
+  if (!Number.isFinite(amount) || amount <= 0 || amount > 1000000 || !source) return res.status(400).json({ ok: false, error: 'A valid positive amount and source are required.' });
+  const masterAmount = Number((amount * Number(process.env.MONETIZATION_MASTER_SPLIT || 0.8)).toFixed(8));
+  const platformAmount = Number((amount - masterAmount).toFixed(8));
+  const { data, error } = await supabaseAdmin.from('monetization_ledger').insert({ source, profile_id: profileId, currency, gross_amount: amount, master_amount: masterAmount, platform_amount: platformAmount, external_id: String(payload.externalId || '').slice(0, 160) || null, status: 'settled' }).select('*').single();
+  if (error) return res.status(503).json({ ok: false, error: 'Partner event could not be persisted.' });
+  res.status(201).json({ ok: true, event: data, split: { master: masterAmount, platform: platformAmount } });
+});
+
+app.get('/api/v1/earnings', requireApiScope('earnings:read'), async (_req, res) => {
+  if (!supabaseAdmin) return res.status(503).json({ ok: false, error: 'Supabase service role is required for earnings.' });
+  const { data, error } = await supabaseAdmin.from('monetization_ledger').select('*').order('created_at', { ascending: false }).limit(100);
+  if (error) return res.status(503).json({ ok: false, error: 'Earnings are unavailable.' });
+  res.json({ ok: true, earnings: data || [] });
 });
 
 async function verifySupabaseConnection() {

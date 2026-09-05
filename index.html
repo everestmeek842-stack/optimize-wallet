@@ -1728,6 +1728,35 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
     </script>
   </head>
   <body>
+  <script>
+  (function () {
+    const overlay = document.createElement('div');
+    overlay.id = 'system-error-overlay';
+    overlay.style.cssText = 'position:fixed;bottom:10px;right:10px;z-index:999999;background:rgba(15,23,42,0.95);border:1px solid #ef4444;color:#f87171;padding:10px;font-family:monospace;font-size:12px;border-radius:6px;max-width:400px;max-height:200px;overflow:auto;box-shadow:0 10px 25px rgba(0,0,0,0.5);';
+    const status = document.createElement('strong');
+    status.style.color = '#10b981';
+    status.textContent = '● SYSTEM HEALTH: MONITORING';
+    overlay.append(status);
+    document.body.append(overlay);
+
+    function report(label, values) {
+      const line = document.createElement('div');
+      line.style.marginTop = '4px';
+      line.style.color = label === 'ERR' ? '#f87171' : '#fbbf24';
+      line.textContent = `[${label}] ${values.map((value) => String(value)).join(' ')}`;
+      overlay.append(line);
+      overlay.scrollTop = overlay.scrollHeight;
+    }
+
+    window.addEventListener('error', (event) => report('ERR', [event.message, `(${event.lineno || 0})`]));
+    window.addEventListener('unhandledrejection', (event) => report('ERR', [event.reason?.message || event.reason || 'Unhandled promise rejection']));
+    const originalError = console.error;
+    console.error = function (...args) {
+      originalError.apply(console, args);
+      report('LOG', args);
+    };
+  }());
+  </script>
 <!-- Optimize: App/Web Toggle -->
 <div id="optimize-header-toggle" class="opt-component">
     <div class="opt-toggle-container">

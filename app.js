@@ -1,6 +1,11 @@
 const STORAGE_KEY = "nexus-ai-workspace-v1";
 const SESSION_KEYS = "nexus-ai-session-keys-v1";
 
+function sanitizeInput(value) {
+  if (typeof value !== 'string') return value;
+  return value.replace(/[&<>"']/g, (character) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[character]));
+}
+
 const DESKTOP_MATRIX_APPS = [
   ['volume', '🔊', 'Audio Control'], ['security', '🛡️', 'Security Core'], ['usb', '🔌', 'USB Mount'], ['firewall', '⚠️', 'Firewall Alert'], ['bluetooth', 'ᛒ', 'Bluetooth'],
   ['design', '🖊️', 'Design Tool'], ['cloud', '☁️', 'Cloud Storage'], ['analytics', '📊', 'Analytics'], ['telegram', '✈️', 'Telegram'], ['identity', '🧑', 'Identity Engine'],
