@@ -1,10 +1,17 @@
 {
   "version": 2,
   "name": "nexus-platform-web",
-  "builds": [
-    { "src": "index.html", "use": "@vercel/static" }
-  ],
-  "routes": [
-    { "src": "/(.*)", "dest": "/index.html" }
+  "functions": {
+    "api/index.js": {
+      "memory": 1024,
+      "maxDuration": 30
+    }
+  },
+  "rewrites": [
+    { "source": "/api/(.*)", "destination": "/api/index.js" },
+    { "source": "/health", "destination": "/api/index.js" },
+    { "source": "/explorer", "destination": "/explorer-workspace.html" },
+    { "source": "/explorer/", "destination": "/explorer-workspace.html" },
+    { "source": "/login", "destination": "/auth-login.html" }
   ]
 }

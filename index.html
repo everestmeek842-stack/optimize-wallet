@@ -2278,6 +2278,55 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
   })();
 </script>
 
+<section id="payout-binding" aria-labelledby="payout-binding-title" style="position:fixed;right:18px;bottom:18px;z-index:9999;width:min(360px,calc(100vw - 36px));padding:16px;border:1px solid #2e4063;border-radius:14px;background:#101827;color:#eef4ff;box-shadow:0 16px 44px rgba(0,0,0,.35);font-family:system-ui,sans-serif">
+  <h2 id="payout-binding-title" style="margin:0 0 8px;font-size:18px">Payout wallet binding</h2>
+  <p style="margin:0 0 12px;color:#aec0dd;font-size:13px">Wallets are saved to your account. Claims create a review request; no automatic payout is sent.</p>
+  <label style="display:block;margin:8px 0 4px">Solana (SOL) address</label>
+  <input id="payout-solana-address" autocomplete="off" placeholder="Solana public address" style="box-sizing:border-box;width:100%;padding:9px;border-radius:7px;border:1px solid #3b4e70;background:#0a1220;color:inherit">
+  <label style="display:block;margin:8px 0 4px">USDT address</label>
+  <input id="payout-usdt-address" autocomplete="off" placeholder="TRC-20 or SPL address" style="box-sizing:border-box;width:100%;padding:9px;border-radius:7px;border:1px solid #3b4e70;background:#0a1220;color:inherit">
+  <select id="payout-usdt-network" aria-label="USDT network" style="margin-top:8px;width:100%;padding:9px;border-radius:7px;border:1px solid #3b4e70;background:#0a1220;color:inherit"><option value="TRC20">USDT TRC-20</option><option value="SPL">USDT SPL</option></select>
+  <button id="save-payout-wallets" type="button" style="margin-top:10px;width:100%;padding:10px;border:0;border-radius:7px;background:#32c997;color:#062419;font-weight:700;cursor:pointer">Save payout wallets</button>
+  <div style="display:flex;gap:8px;margin-top:10px"><input id="airdrop-amount" type="number" min="1" max="5" step="1" value="1" aria-label="Claim amount in USD" style="width:82px;padding:8px;border-radius:7px;border:1px solid #3b4e70;background:#0a1220;color:inherit"><button id="request-airdrop" type="button" style="flex:1;padding:8px;border:0;border-radius:7px;background:#5178ff;color:white;font-weight:700;cursor:pointer">Request $1–$5 claim</button></div>
+  <p id="payout-binding-status" role="status" style="min-height:18px;margin:10px 0 0;color:#aec0dd;font-size:12px"></p>
+</section>
+<script>
+(() => {
+  const byId = (id) => document.getElementById(id);
+  const api = (path) => window.nexusApiUrl ? window.nexusApiUrl(path) : path;
+  const status = (message, error = false) => { const el = byId('payout-binding-status'); el.textContent = message; el.style.color = error ? '#ff9d9d' : '#aec0dd'; };
+  const request = async (path, options = {}) => {
+    const response = await fetch(api(path), { credentials: 'same-origin', headers: { 'Content-Type': 'application/json', ...(options.headers || {}) }, ...options });
+    const body = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(body.error || 'Request failed.');
+    return body;
+  };
+  const load = async () => {
+    try {
+      const { binding } = await request('/api/wallet-binding');
+      if (!binding) return status('Bind both payout wallets to request a claim.');
+      byId('payout-solana-address').value = binding.solana_address || '';
+      byId('payout-usdt-address').value = binding.usdt_address || '';
+      byId('payout-usdt-network').value = binding.usdt_network || 'TRC20';
+      status(`Saved. Available: $${Number(binding.available_balance_usd || 0).toFixed(2)}; pending: $${Number(binding.pending_balance_usd || 0).toFixed(2)}.`);
+    } catch (error) { status(error.message === 'Authentication required.' ? 'Log in to bind payout wallets.' : error.message, true); }
+  };
+  byId('save-payout-wallets').addEventListener('click', async () => {
+    try {
+      const { binding } = await request('/api/wallet-binding', { method: 'PUT', body: JSON.stringify({ solanaAddress: byId('payout-solana-address').value, usdtAddress: byId('payout-usdt-address').value, usdtNetwork: byId('payout-usdt-network').value }) });
+      status(`Wallets saved at ${new Date(binding.updated_at).toLocaleTimeString()}.`);
+    } catch (error) { status(error.message, true); }
+  });
+  byId('request-airdrop').addEventListener('click', async () => {
+    try {
+      const { claim, nextClaimAt } = await request('/api/airdrop/claim-request', { method: 'POST', body: JSON.stringify({ amount: Number(byId('airdrop-amount').value) }) });
+      status(`Claim request for $${Number(claim.amount_usd).toFixed(2)} saved. Next request after ${new Date(nextClaimAt).toLocaleTimeString()}.`);
+    } catch (error) { status(error.message, true); }
+  });
+  load();
+})();
+</script>
+
 <!-- Tidio Chat Widget for Premium Customer Support & Lead Capture -->
 <script src="//code.tidio.co/8rjgmeyagyitmg5fycvmye611mud39lt.js" async></script>
 

@@ -4,8 +4,11 @@ services:
     env: node
     plan: free
     region: oregon
-    buildCommand: npm install
-    startCommand: node server.js
+    branch: master
+    autoDeploy: true
+    buildCommand: npm ci
+    startCommand: npm start
+    healthCheckPath: /health
     envVars:
       - key: NODE_ENV
         value: production
@@ -68,7 +71,11 @@ services:
       - key: ENABLE_SUPABASE
         value: "true"
       - key: ENABLE_MASTER_WALLET
-        value: "true"
+        value: "false"
+      - key: AIRDROP_COOLDOWN_MINUTES
+        value: "15"
+      - key: PAYOUT_MODE
+        value: manual_review
       - key: PAYOUT_PROVIDER
         sync: false
       - key: PAYOUT_API_KEY

@@ -559,6 +559,7 @@
         .tab-button[data-tab="ai"] .tabs-icon::before { content: '🤖'; }
         .tab-button[data-tab="pdf"] .tabs-icon::before { content: '📄'; }
         .tab-button[data-tab="config"] .tabs-icon::before { content: '⚙️'; }
+        .tab-button[data-tab="wallet"] .tabs-icon::before { content: '💳'; }
 
         .earning-ticker {
             display: flex;
@@ -685,6 +686,61 @@
             margin-bottom: 24px;
             max-width: 300px;
         }
+
+        /* ===== APP-LIKE FIXED LAYOUT — the page itself never scrolls ===== */
+        html, body { overscroll-behavior: none; }
+        .mail-workspace {
+            flex: 1;
+            min-height: 0;
+            display: grid;
+            grid-template-columns: minmax(0, 1.15fr) minmax(0, 0.85fr);
+            gap: 16px;
+            padding: 20px;
+        }
+        .mail-left, .mail-right { min-height: 0; display: flex; flex-direction: column; gap: 16px; }
+        .mail-compose-section { flex: 0 0 auto; }
+        .mail-history-section { flex: 1 1 auto; min-height: 120px; }
+        .mail-history-section .list { max-height: none; overflow-y: auto; min-height: 0; }
+        @media (max-width: 1100px) {
+            .mail-workspace { grid-template-columns: 1fr; overflow-y: auto; }
+            .mail-left, .mail-right { min-height: auto; }
+        }
+
+        /* AI chat inside mail.com */
+        .ai-chat-card { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+        .ai-status-row { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; flex-wrap: wrap; }
+        .ai-status-note { font-size: 11px; color: var(--faint); }
+        .ai-chat-messages { flex: 1; min-height: 160px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; padding-right: 4px; }
+        .ai-chat-messages::-webkit-scrollbar { width: 6px; }
+        .ai-chat-messages::-webkit-scrollbar-thumb { background: rgba(212, 175, 55, 0.3); border-radius: 4px; }
+        .chat-msg { max-width: 88%; padding: 10px 14px; border-radius: 12px; font-size: 13.5px; line-height: 1.55; white-space: pre-wrap; word-break: break-word; }
+        .chat-msg.user { align-self: flex-end; background: rgba(138, 43, 226, 0.22); border: 1px solid rgba(138, 43, 226, 0.4); }
+        .chat-msg.assistant { align-self: flex-start; background: rgba(255, 255, 255, 0.05); border: 1px solid var(--line); }
+        .chat-msg.system { align-self: center; background: rgba(255, 193, 7, 0.08); border: 1px solid rgba(255, 193, 7, 0.3); color: #ffc107; font-size: 12.5px; }
+        .chat-msg.thinking { color: var(--muted); font-style: italic; }
+        .chat-draft { margin-top: 10px; padding-top: 10px; border-top: 1px dashed var(--line-strong); }
+        .chat-draft-subject { font-weight: 700; color: var(--accent); margin: 0 0 6px; font-size: 13px; }
+        .chat-draft-actions { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
+        .chat-mini-btn { padding: 6px 12px; font-size: 12px; border-radius: 6px; background: rgba(212, 175, 55, 0.15); border: 1px solid rgba(212, 175, 55, 0.4); color: var(--accent); font-weight: 600; }
+        .chat-mini-btn:hover { background: rgba(212, 175, 55, 0.28); }
+        .ai-quick-row { display: flex; gap: 8px; flex-wrap: wrap; margin: 12px 0; }
+        .chip { padding: 6px 12px; font-size: 12px; border-radius: 999px; background: rgba(255, 255, 255, 0.06); border: 1px solid var(--line-strong); color: var(--muted); }
+        .chip:hover { border-color: var(--accent); color: var(--text); }
+        .ai-input-row { display: flex; gap: 10px; align-items: flex-end; margin-top: auto; }
+        .ai-input-row textarea { flex: 1; min-height: 64px; max-height: 120px; resize: none; padding: 10px 14px; background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 10px; color: var(--text); font-size: 13.5px; }
+        .ai-input-row textarea:focus { outline: none; border-color: var(--accent); }
+
+        /* Wallet & funds */
+        .wallet-status-row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+        .wallet-inline-status { font-size: 12.5px; color: var(--muted); margin-left: 10px; }
+        .wallet-address { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11px; color: var(--faint); word-break: break-all; }
+
+        /* Toast notifications */
+        .toast-stack { position: fixed; right: 18px; bottom: 18px; display: flex; flex-direction: column; gap: 8px; z-index: 9999; }
+        .toast { padding: 12px 16px; border-radius: 10px; background: rgba(18, 18, 28, 0.96); border: 1px solid var(--accent); color: var(--text); font-size: 13px; box-shadow: 0 8px 30px rgba(0, 0, 0, 0.5); max-width: 360px; animation: toast-in 0.22s ease; }
+        .toast.success { border-color: var(--success); }
+        .toast.error { border-color: var(--danger); }
+        @keyframes toast-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
     </style>
 </head>
 <body>
@@ -737,14 +793,20 @@
                 Configuration
                 <span class="tab-badge">4</span>
             </button>
+            <button class="tab-button" data-tab="wallet">
+                <span class="tabs-icon"></span>
+                💳 Wallet &amp; Funds
+                <span class="tab-badge">5</span>
+            </button>
         </div>
 
         <!-- Content -->
         <div class="explorer-content">
-            <!-- MAIL TAB -->
+            <!-- MAIL TAB — MAIN INTERFACE (compose + AI drafting inside) -->
             <div class="tab-panel active" id="mail-panel">
-                <div class="tab-panel-content">
-                    <div class="section">
+                <div class="mail-workspace">
+                    <div class="mail-left">
+                        <div class="section mail-compose-section">
                         <h2 class="section-title">📧 Mail.com Interface <small>Direct Communication Hub</small></h2>
                         <div class="form-group">
                             <label>Recipient Email(s)</label>
@@ -765,13 +827,38 @@
                         <button class="btn" id="sendEmailBtn">Send Email</button>
                     </div>
 
-                    <div class="section">
+                        <div class="section mail-history-section">
                         <h2 class="section-title">✉️ Email History <small>Recent Communications</small></h2>
                         <div class="list" id="emailHistory">
                             <div class="empty-state">
                                 <div class="empty-state-icon">📪</div>
                                 <div class="empty-state-title">No Emails Sent Yet</div>
                                 <div class="empty-state-desc">Start by composing and sending your first email</div>
+                            </div>
+                        </div>
+                        </div>
+                    </div>
+
+                    <div class="mail-right">
+                        <div class="section ai-chat-card" id="aiChatCard">
+                            <h2 class="section-title">🤖 AI Drafting Assistant <small>Gemini · Inside mail.com</small></h2>
+                            <div class="ai-status-row">
+                                <span class="status-badge warning" id="aiStatusChip"><span class="status-indicator warning"></span>Checking server…</span>
+                                <span class="ai-status-note">Key lives on the server — never in your browser</span>
+                            </div>
+                            <div class="ai-chat-messages" id="aiChatMessages">
+                                <div class="chat-msg assistant">Hello! Ask me to prepare text for your email — for example “Prepare a short professional email introducing my services”. I will write it here and you can insert it into your email with one click.</div>
+                            </div>
+                            <div class="ai-quick-row" id="aiQuickPrompts">
+                                <button class="chip" type="button" data-prompt="Write a short professional introduction email presenting myself and asking for a meeting.">✉️ Introduction</button>
+                                <button class="chip" type="button" data-prompt="Write a polite follow-up email asking for an update on my previous message.">🔁 Follow-up</button>
+                                <button class="chip" type="button" data-prompt="Write a warm thank-you email after a successful meeting and payment.">🙏 Thank-you</button>
+                                <button class="chip" type="button" data-action="improve" data-prompt="Improve and polish my current email draft.">✨ Improve draft</button>
+                                <button class="chip" type="button" data-action="shorten" data-prompt="Make my current email draft shorter and clearer.">✂️ Shorten</button>
+                            </div>
+                            <div class="ai-input-row">
+                                <textarea id="aiChatInput" placeholder="Ask the AI to prepare text for you… e.g. “Prepare a payment reminder email for a client” (Ctrl+Enter to send)"></textarea>
+                                <button class="btn" id="aiChatSendBtn">Prepare</button>
                             </div>
                         </div>
                     </div>
@@ -995,6 +1082,101 @@
                         <h2 class="section-title">💰 Monetization Strategies <small>15 Revenue Engines</small></h2>
                         <div id="strategiesList" class="list" style="max-height: 300px; overflow-y: auto;">
                             <!-- Generated by JS -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- WALLET & FUNDS TAB -->
+            <div class="tab-panel" id="wallet-panel">
+                <div class="tab-panel-content">
+                    <div class="section">
+                        <h2 class="section-title">💳 Wallet &amp; Funds <small>Bind · Earn · Withdraw</small></h2>
+                        <div class="wallet-status-row">
+                            <span class="status-badge warning" id="walletAuthStatus"><span class="status-indicator warning"></span>Checking login…</span>
+                            <span class="status-badge warning" id="walletTelegramStatus"><span class="status-indicator warning"></span>Telegram: checking…</span>
+                            <a class="btn btn-secondary" id="walletLoginLink" href="/login" style="display:none;">Log in / Register</a>
+                            <button class="btn btn-secondary" id="walletRefreshBtn" type="button">Refresh</button>
+                        </div>
+                        <div class="grid-2" style="margin-top: 16px;">
+                            <div class="card">
+                                <h3 class="card-title">Available Balance</h3>
+                                <p class="card-desc">Cleared funds held in your bound wallet</p>
+                                <div class="card-stat"><span class="card-stat-label">USD</span><span class="card-stat-value" id="walletAvailable">$0.00</span></div>
+                            </div>
+                            <div class="card">
+                                <h3 class="card-title">Pending Balance</h3>
+                                <p class="card-desc">Earnings under review</p>
+                                <div class="card-stat"><span class="card-stat-label">USD</span><span class="card-stat-value" id="walletPending">$0.00</span></div>
+                            </div>
+                            <div class="card">
+                                <h3 class="card-title">Lifetime Explorer Earnings</h3>
+                                <p class="card-desc">Everything this workspace earned (persisted in Supabase)</p>
+                                <div class="card-stat"><span class="card-stat-label">USD</span><span class="card-stat-value" id="walletLifetime">$0.00</span></div>
+                            </div>
+                            <div class="card">
+                                <h3 class="card-title">Master Treasury</h3>
+                                <p class="card-desc">Settlement treasury for payouts</p>
+                                <div class="card-stat"><span class="card-stat-label">Network</span><span class="card-stat-value" id="walletNetwork">SOLANA</span></div>
+                                <div class="wallet-address" id="walletMasterAddress" style="margin-top: 8px;"></div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="section">
+                        <h2 class="section-title">🔐 Bind Your Wallet <small>SOL + USDT payout addresses</small></h2>
+                        <div class="form-group">
+                            <label>Solana Wallet Address (SOL)</label>
+                            <input type="text" id="walletSolanaAddress" placeholder="Your Solana address (32–44 characters)" />
+                        </div>
+                        <div class="form-group">
+                            <label>USDT Network</label>
+                            <select id="walletUsdtNetwork">
+                                <option value="TRC20">TRC20 (TRON)</option>
+                                <option value="SPL">SPL (Solana)</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>USDT Payout Address</label>
+                            <input type="text" id="walletUsdtAddress" placeholder="TRON (T…) or Solana address that receives USDT" />
+                        </div>
+                        <div style="display:flex; align-items:center;">
+                            <button class="btn" id="saveWalletBtn">Save Wallet Binding</button>
+                            <span class="wallet-inline-status" id="walletSaveStatus"></span>
+                        </div>
+                    </div>
+
+                    <div class="section">
+                        <h2 class="section-title">🏧 Access Your Funds <small>Withdraw &amp; claim</small></h2>
+                        <div class="grid-2">
+                            <div>
+                                <div class="form-group">
+                                    <label>Withdraw Amount (USD)</label>
+                                    <input type="number" id="withdrawAmount" min="1" step="0.01" placeholder="1.00" />
+                                </div>
+                                <div class="form-group">
+                                    <label>Asset</label>
+                                    <select id="withdrawAsset">
+                                        <option value="USDT">USDT</option>
+                                        <option value="SOL">SOL</option>
+                                    </select>
+                                </div>
+                                <button class="btn" id="withdrawBtn">Request Withdrawal</button>
+                            </div>
+                            <div>
+                                <p class="card-desc">Airdrop claim: $1–$5 per request with a short cooldown. Requests are recorded for authorized review before any payout is sent.</p>
+                                <div class="form-group">
+                                    <label>Claim Amount (USD)</label>
+                                    <input type="number" id="claimAmount" min="1" max="5" step="1" value="1" />
+                                </div>
+                                <button class="btn btn-secondary" id="claimBtn">Request Claim</button>
+                            </div>
+                        </div>
+                        <div class="list" id="walletRequests" style="margin-top: 16px;">
+                            <div class="empty-state">
+                                <div class="empty-state-icon">🧾</div>
+                                <div class="empty-state-title">No Requests Yet</div>
+                                <div class="empty-state-desc">Withdrawal and claim requests will appear here</div>
+                            </div>
                         </div>
                     </div>
                 </div>

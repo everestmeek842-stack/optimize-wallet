@@ -137,19 +137,97 @@ function getUserById(id) {
   return Object.values(users).find((user) => user.id === id) || null;
 }
 
-function getUserFromRequest(req) {
-  const token = getCookieValue(req.headers.cookie || '', 'sessionToken');
-  if (!token || !sessions[token]) return null;
-  const session = sessions[token];
-  if (Date.now() > session.expiresAt) {
-    delete sessions[token];
-    return null;
-  }
-  return getUserById(session.userId);
+function hashSessionToken(token) {
+  const secret = process.env.SESSION_SECRET || 'nexus-dev-session-secret';
+  return crypto.createHmac('sha256', secret).update(token).digest('hex');
 }
 
-function requireAuth(req, res, next) {
-  const user = getUserFromRequest(req);
+// Sessions live in memory for local runs and in Supabase for serverless
+// deployments (Vercel) where memory does not survive between invocations.
+async function persistSession(token, userId, expiresAt) {
+  sessions[token] = { userId, expiresAt };
+  if (!supabaseAdmin) return;
+  try {
+    await supabaseAdmin.from('user_sessions').insert({
+      token_hash: hashSessionToken(token),
+      user_id: userId,
+      expires_at: new Date(expiresAt).toISOString(),
+    });
+  } catch (error) {
+    console.warn('[Auth] Session persistence skipped:', error.message);
+  }
+}
+
+// Mirror the local user store into Supabase so registrations survive
+// ephemeral serverless filesystems.
+async function mirrorUser(user) {
+  if (!supabaseAdmin) return;
+  try {
+    await supabaseAdmin.from('app_users').upsert({
+      id: user.id,
+      email: user.email,
+      name: user.name,
+      password_hash: user.passwordHash,
+      password_salt: user.passwordSalt,
+      created_at: user.createdAt,
+    }, { onConflict: 'id' });
+  } catch (error) {
+    console.warn('[Auth] User mirror skipped:', error.message);
+  }
+}
+
+async function loadUserById(id) {
+  const local = getUserById(id);
+  if (local) return local;
+  if (!supabaseAdmin) return null;
+  try {
+    const { data, error } = await supabaseAdmin
+      .from('app_users')
+      .select('id,email,name,password_hash,password_salt,created_at')
+      .eq('id', id)
+      .maybeSingle();
+    if (error || !data) return null;
+    return {
+      id: data.id,
+      email: data.email,
+      name: data.name,
+      passwordHash: data.password_hash,
+      passwordSalt: data.password_salt,
+      createdAt: data.created_at,
+    };
+  } catch (error) {
+    return null;
+  }
+}
+
+async function getUserFromRequest(req) {
+  const token = getCookieValue(req.headers.cookie || '', 'sessionToken');
+  if (!token) return null;
+  const session = sessions[token];
+  if (session) {
+    if (Date.now() > session.expiresAt) {
+      delete sessions[token];
+      return null;
+    }
+    return loadUserById(session.userId);
+  }
+  if (!supabaseAdmin) return null;
+  try {
+    const { data: stored, error } = await supabaseAdmin
+      .from('user_sessions')
+      .select('user_id,expires_at')
+      .eq('token_hash', hashSessionToken(token))
+      .maybeSingle();
+    if (error || !stored) return null;
+    if (Date.now() > Date.parse(stored.expires_at)) return null;
+    return loadUserById(stored.user_id);
+  } catch (error) {
+    return null;
+  }
+}
+
+async function requireAuth(req, res, next) {
+  const user = await getUserFromRequest(req);
   if (!user) {
     return res.status(401).json({ ok: false, error: 'Authentication required.' });
   }
@@ -159,7 +237,8 @@ function requireAuth(req, res, next) {
 
 function setSessionCookie(res, token) {
   const expires = new Date(Date.now() + SESSION_TTL_MS).toUTCString();
-  res.setHeader('Set-Cookie', `sessionToken=${encodeURIComponent(token)}; Path=/; HttpOnly; SameSite=Lax; Secure=false; Expires=${expires}`);
+  const secure = process.env.NODE_ENV === 'production' ? '; Secure' : '';
+  res.setHeader('Set-Cookie', `sessionToken=${encodeURIComponent(token)}; Path=/; HttpOnly; SameSite=Lax${secure}; Expires=${expires}`);
 }
 
 function clearSessionCookie(res) {
@@ -355,6 +434,41 @@ async function verifySupabaseConnection() {
   }
 }
 
+function requireSupabaseAdmin(res) {
+  if (supabaseAdmin) return true;
+  res.status(503).json({
+    ok: false,
+    error: 'Persistent storage is not configured. Set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY.',
+  });
+  return false;
+}
+
+function validSolanaAddress(value) {
+  // Base58 public keys are 32 bytes, normally encoded in 32–44 characters.
+  return /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(value);
+}
+
+function validTronAddress(value) {
+  return /^T[1-9A-HJ-NP-Za-km-z]{33}$/.test(value);
+}
+
+function normaliseWalletBinding(payload = {}) {
+  const solanaAddress = String(payload.solanaAddress || '').trim();
+  const usdtAddress = String(payload.usdtAddress || '').trim();
+  const usdtNetwork = String(payload.usdtNetwork || '').toUpperCase();
+
+  if (!solanaAddress || !validSolanaAddress(solanaAddress)) {
+    return { error: 'A valid Solana address is required.' };
+  }
+  if (!['TRC20', 'SPL'].includes(usdtNetwork)) {
+    return { error: 'USDT network must be TRC20 or SPL.' };
+  }
+  if (!usdtAddress || (usdtNetwork === 'TRC20' ? !validTronAddress(usdtAddress) : !validSolanaAddress(usdtAddress))) {
+    return { error: `A valid ${usdtNetwork === 'TRC20' ? 'TRON' : 'Solana'} USDT address is required.` };
+  }
+  return { solanaAddress, usdtAddress, usdtNetwork };
+}
+
 const baseMetrics = {
   ads: 128.4,
   cinema: 356.1,
@@ -391,20 +505,15 @@ function normaliseWallet(value) {
 }
 
 async function startServer(port) {
-  await verifySupabaseConnection();
-  console.log('Local Frontend: http://localhost:8000');
-  console.log(`Local Backend API: http://localhost:${port}`);
-
   const server = app.listen(port, () => {
-    console.log(`Nexus backend listening on http://localhost:${port}`);
+    console.log(`Nexus backend listening on port ${port}`);
+    // Diagnostics must never delay the platform port bind or prevent a deploy.
+    verifySupabaseConnection().catch((error) => console.warn('[Supabase] Startup diagnostic failed:', error.message));
   });
 
   server.on('error', (error) => {
     if (error.code === 'EADDRINUSE') {
-      const nextPort = port + 1;
-      console.warn(`Port ${port} is busy. Retrying on ${nextPort}...`);
-      startServer(nextPort);
-      return;
+      console.error(`Port ${port} is already in use. Refusing to bind a different port.`);
     }
 
     console.error('Failed to start backend server:', error);
@@ -412,23 +521,59 @@ async function startServer(port) {
   });
 }
 
-function notifyTelegram(message) {
+function isPlaceholderValue(value) {
+  const text = String(value || '').trim();
+  if (!text) return true;
+  return /^your-/i.test(text) || text.length < 10;
+}
+
+function telegramConfigured() {
+  return Boolean(
+    process.env.ENABLE_TELEGRAM_ALERTS !== 'false' &&
+    !isPlaceholderValue(process.env.TELEGRAM_BOT_TOKEN) &&
+    !isPlaceholderValue(process.env.TELEGRAM_CHAT_ID)
+  );
+}
+
+const telegramAlertThrottle = new Map();
+const TELEGRAM_ALERT_COOLDOWN_MS = 45 * 1000;
+
+// Real Telegram delivery. Earnings and wallet updates are pushed straight into
+// the configured Telegram chat so the balance is visible inside Telegram too.
+async function notifyTelegram(message, { throttleKey = null } = {}) {
   const botToken = process.env.TELEGRAM_BOT_TOKEN;
   const chatId = process.env.TELEGRAM_CHAT_ID;
 
-  if (!botToken || !chatId) {
+  if (!telegramConfigured()) {
     console.log('[Telegram] Alert ready but not configured yet:', message);
-    return {
-      ok: false,
-      reason: 'Telegram bot not configured'
-    };
+    return { ok: false, reason: 'Telegram bot not configured', message };
   }
 
-  return {
-    ok: true,
-    message,
-    timestamp: new Date().toISOString()
-  };
+  if (throttleKey) {
+    const lastSentAt = telegramAlertThrottle.get(throttleKey) || 0;
+    if (Date.now() - lastSentAt < TELEGRAM_ALERT_COOLDOWN_MS) {
+      return { ok: false, reason: 'Throttled to avoid alert spam', message };
+    }
+    telegramAlertThrottle.set(throttleKey, Date.now());
+  }
+
+  try {
+    const requestUrl = 'https://api.telegram.org/bot' + botToken + '/sendMessage';
+    const response = await fetch(requestUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ chat_id: chatId, text: message, parse_mode: 'HTML', disable_web_page_preview: true }),
+    });
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok || result.ok === false) {
+      console.warn('[Telegram] sendMessage failed:', result.description || `HTTP ${response.status}`);
+      return { ok: false, reason: result.description || `HTTP ${response.status}`, message };
+    }
+    return { ok: true, message, deliveredAt: new Date().toISOString() };
+  } catch (error) {
+    console.warn('[Telegram] sendMessage error:', error.message);
+    return { ok: false, reason: error.message, message };
+  }
 }
 
 app.get('/health', (_req, res) => {
@@ -446,8 +591,8 @@ app.get('/login', (_req, res) => {
   res.sendFile(path.join(__dirname, 'auth-login.html'));
 });
 
-app.get('/api/auth/me', (req, res) => {
-  const user = getUserFromRequest(req);
+app.get('/api/auth/me', async (req, res) => {
+  const user = await getUserFromRequest(req);
   if (!user) {
     return res.status(401).json({ ok: false, error: 'Not authenticated.' });
   }
@@ -463,7 +608,7 @@ app.get('/api/auth/me', (req, res) => {
   });
 });
 
-app.post('/api/auth/register', (req, res) => {
+app.post('/api/auth/register', async (req, res) => {
   try {
     const payload = req.body || {};
     const email = normaliseEmail(payload.email);
@@ -496,9 +641,10 @@ app.post('/api/auth/register', (req, res) => {
 
     users[email] = user;
     writeUsers(users);
+    await mirrorUser(user);
 
     const token = generateToken();
-    sessions[token] = { userId: user.id, expiresAt: Date.now() + SESSION_TTL_MS };
+    await persistSession(token, user.id, Date.now() + SESSION_TTL_MS);
     setSessionCookie(res, token);
 
     res.status(201).json({
@@ -511,7 +657,7 @@ app.post('/api/auth/register', (req, res) => {
   }
 });
 
-app.post('/api/auth/login', (req, res) => {
+app.post('/api/auth/login', async (req, res) => {
   try {
     const payload = req.body || {};
     const email = normaliseEmail(payload.email);
@@ -532,8 +678,9 @@ app.post('/api/auth/login', (req, res) => {
       return res.status(401).json({ ok: false, error: 'Invalid email or password.' });
     }
 
+    await mirrorUser(user);
     const token = generateToken();
-    sessions[token] = { userId: user.id, expiresAt: Date.now() + SESSION_TTL_MS };
+    await persistSession(token, user.id, Date.now() + SESSION_TTL_MS);
     setSessionCookie(res, token);
 
     res.json({
@@ -553,8 +700,8 @@ app.post('/api/auth/logout', (req, res) => {
   res.json({ ok: true, message: 'Logged out.' });
 });
 
-app.get('/', (req, res) => {
-  const user = getUserFromRequest(req);
+app.get('/', async (req, res) => {
+  const user = await getUserFromRequest(req);
   if (!user) {
     return res.redirect('/login');
   }
@@ -585,6 +732,74 @@ app.get('/api/admin/dashboard', (_req, res) => {
     strategies: masterWalletStrategies,
     ledger: ledger.slice(-20).reverse()
   });
+});
+
+// Durable wallet binding and payout-request records. These routes deliberately do
+// not custody keys, sign transactions, or represent a payment as settled.
+app.get('/api/wallet-binding', requireAuth, async (req, res) => {
+  if (!requireSupabaseAdmin(res)) return;
+  const { data, error } = await supabaseAdmin
+    .from('wallet_bindings')
+    .select('solana_address,usdt_address,usdt_network,available_balance_usd,pending_balance_usd,updated_at')
+    .eq('user_id', req.user.id)
+    .maybeSingle();
+  if (error) return res.status(503).json({ ok: false, error: 'Unable to load wallet binding.' });
+  return res.json({ ok: true, binding: data || null });
+});
+
+app.put('/api/wallet-binding', requireAuth, async (req, res) => {
+  if (!requireSupabaseAdmin(res)) return;
+  const binding = normaliseWalletBinding(req.body);
+  if (binding.error) return res.status(400).json({ ok: false, error: binding.error });
+  const { data, error } = await supabaseAdmin
+    .from('wallet_bindings')
+    .upsert({
+      user_id: req.user.id,
+      solana_address: binding.solanaAddress,
+      usdt_address: binding.usdtAddress,
+      usdt_network: binding.usdtNetwork,
+      updated_at: new Date().toISOString(),
+    }, { onConflict: 'user_id' })
+    .select('solana_address,usdt_address,usdt_network,available_balance_usd,pending_balance_usd,updated_at')
+    .single();
+  if (error) return res.status(503).json({ ok: false, error: 'Unable to save wallet binding.' });
+  return res.json({ ok: true, binding: data });
+});
+
+app.post('/api/airdrop/claim-request', requireAuth, async (req, res) => {
+  if (!requireSupabaseAdmin(res)) return;
+  const amount = Number(req.body?.amount);
+  const cooldownMinutes = Math.max(10, Math.min(15, Number(process.env.AIRDROP_COOLDOWN_MINUTES || 15)));
+  if (!Number.isFinite(amount) || amount < 1 || amount > 5) {
+    return res.status(400).json({ ok: false, error: 'Claim amount must be between $1 and $5.' });
+  }
+  const { data: binding, error: bindingError } = await supabaseAdmin
+    .from('wallet_bindings').select('user_id').eq('user_id', req.user.id).maybeSingle();
+  if (bindingError || !binding) return res.status(400).json({ ok: false, error: 'Bind payout wallets before requesting a claim.' });
+  const { data: lastClaim, error: claimLookupError } = await supabaseAdmin
+    .from('airdrop_claims').select('claimed_at').eq('user_id', req.user.id).order('claimed_at', { ascending: false }).limit(1).maybeSingle();
+  if (claimLookupError) return res.status(503).json({ ok: false, error: 'Unable to check the claim cooldown.' });
+  const nextClaimAt = lastClaim ? new Date(new Date(lastClaim.claimed_at).getTime() + cooldownMinutes * 60 * 1000) : null;
+  if (nextClaimAt && nextClaimAt > new Date()) {
+    return res.status(429).json({ ok: false, error: 'Claim cooldown is active.', nextClaimAt: nextClaimAt.toISOString() });
+  }
+  const { data: claim, error } = await supabaseAdmin.from('airdrop_claims').insert({
+    user_id: req.user.id, amount_usd: amount, status: 'requested', claimed_at: new Date().toISOString(),
+  }).select('id,amount_usd,status,claimed_at').single();
+  if (error) return res.status(503).json({ ok: false, error: 'Unable to persist claim request.' });
+  return res.status(202).json({ ok: true, claim, nextClaimAt: new Date(Date.now() + cooldownMinutes * 60 * 1000).toISOString(), message: 'Claim request recorded for authorized review. No blockchain payout has been sent.' });
+});
+
+app.post('/api/withdrawal-requests', requireAuth, async (req, res) => {
+  if (!requireSupabaseAdmin(res)) return;
+  const amount = Number(req.body?.amount);
+  const asset = String(req.body?.asset || 'USDT').toUpperCase();
+  if (!Number.isFinite(amount) || amount <= 0 || !['SOL', 'USDT'].includes(asset)) return res.status(400).json({ ok: false, error: 'Provide a positive SOL or USDT withdrawal amount.' });
+  const { data: binding } = await supabaseAdmin.from('wallet_bindings').select('user_id').eq('user_id', req.user.id).maybeSingle();
+  if (!binding) return res.status(400).json({ ok: false, error: 'Bind payout wallets before requesting a withdrawal.' });
+  const { data, error } = await supabaseAdmin.from('withdrawal_requests').insert({ user_id: req.user.id, asset, amount, status: 'requested' }).select('id,asset,amount,status,created_at').single();
+  if (error) return res.status(503).json({ ok: false, error: 'Unable to persist withdrawal request.' });
+  return res.status(202).json({ ok: true, withdrawal: data, message: 'Withdrawal request recorded for authorized review. No blockchain payout has been sent.' });
 });
 
 app.get('/api/master-wallet/strategies', (_req, res) => {
@@ -621,7 +836,7 @@ app.post('/api/telemetry/earnings', (req, res) => {
   });
 });
 
-app.post('/api/config/master-wallet', (req, res) => {
+app.post('/api/config/master-wallet', requireKeyManager, (req, res) => {
   const payload = req.body || {};
   const wallet = normaliseWallet(payload.masterWalletAddress || process.env.MASTER_WALLET_ADDRESS);
 
@@ -639,89 +854,21 @@ app.post('/api/config/master-wallet', (req, res) => {
   });
 });
 
-app.post('/api/airdrop/trigger', (req, res) => {
-  const payload = req.body || {};
-  const user = payload.user || 'anonymous';
-  const wallet = normaliseWallet(payload.wallet);
-  const amount = Number(payload.amount || 5);
-
-  if (!wallet) {
-    return res.status(400).json({ ok: false, error: 'Wallet required to trigger airdrop.' });
-  }
-
-  const event = {
-    type: 'airdrop_triggered',
-    user,
-    wallet,
-    amount,
-    createdAt: new Date().toISOString()
-  };
-
-  ledger.push(event);
-
-  const alert = notifyTelegram(`Airdrop triggered for ${user} | ${amount} USD | wallet: ${wallet}`);
-
-  res.json({
-    ok: true,
-    message: 'Airdrop trigger created successfully.',
-    event,
-    telegram: alert
+function legacyPayoutRoute(_req, res) {
+  return res.status(410).json({
+    ok: false,
+    error: 'This demo payout route is retired. Use authenticated wallet binding and claim-request endpoints.',
   });
-});
+}
+app.post('/api/airdrop/trigger', legacyPayoutRoute);
+app.post('/api/airdrop/claim', legacyPayoutRoute);
+app.post('/api/wallet/verify', legacyPayoutRoute);
 
-app.post('/api/airdrop/claim', (req, res) => {
-  const payload = req.body || {};
-  const wallet = normaliseWallet(payload.wallet);
-  const user = payload.user || 'anonymous';
-  const amount = Number(payload.amount || 5);
-
-  if (!wallet) {
-    return res.status(400).json({ ok: false, error: 'Wallet required to claim airdrop.' });
-  }
-
-  const claim = {
-    type: 'airdrop_claimed',
-    user,
-    wallet,
-    amount,
-    status: 'pending_payout',
-    createdAt: new Date().toISOString()
-  };
-
-  ledger.push(claim);
-
-  const alert = notifyTelegram(`Airdrop claimed | user: ${user} | wallet: ${wallet} | amount: ${amount} USD`);
-
-  res.json({
-    ok: true,
-    message: 'Airdrop claim accepted and queued for payout processing.',
-    claim,
-    telegram: alert
-  });
-});
-
-app.post('/api/wallet/verify', (req, res) => {
-  const payload = req.body || {};
-  const wallet = normaliseWallet(payload.wallet);
-
-  if (!wallet) {
-    return res.status(400).json({ ok: false, error: 'Wallet address is required.' });
-  }
-
-  res.json({
-    ok: true,
-    verified: true,
-    wallet,
-    network: payload.network || 'solana',
-    message: 'Wallet verified and ready for future payout processing.'
-  });
-});
-
-app.post('/api/telegram/webhook', (req, res) => {
+app.post('/api/telegram/webhook', async (req, res) => {
   const body = req.body || {};
   const message = body.message || body;
 
-  const telegramAlert = notifyTelegram(`Telegram webhook received: ${JSON.stringify(message).slice(0, 500)}`);
+  const telegramAlert = await notifyTelegram(`Telegram webhook received: ${JSON.stringify(message).slice(0, 500)}`);
 
   res.json({
     ok: true,
@@ -730,7 +877,7 @@ app.post('/api/telegram/webhook', (req, res) => {
   });
 });
 
-app.post('/api/telegram/alert', (req, res) => {
+app.post('/api/telegram/alert', async (req, res) => {
   const payload = req.body || {};
   const botToken = process.env.TELEGRAM_BOT_TOKEN || payload.botToken;
   const chatId = process.env.TELEGRAM_CHAT_ID || payload.chatId;
@@ -739,7 +886,7 @@ app.post('/api/telegram/alert', (req, res) => {
     return res.status(400).json({ ok: false, error: 'Telegram bot token and chat id are required.' });
   }
 
-  const alert = notifyTelegram(payload.message || 'Telegram alert payload accepted for backend processing.');
+  const alert = await notifyTelegram(payload.message || 'Telegram alert payload accepted for backend processing.');
 
   res.json({
     ok: true,
@@ -789,30 +936,85 @@ app.get('/explorer', (_req, res) => {
   res.sendFile(path.join(__dirname, 'explorer-workspace.html'));
 });
 
-// Explorer earnings tracking
-app.post('/api/explorer/earnings', (req, res) => {
+// Explorer earnings tracking — records every earning, persists it to Supabase,
+// credits the bound wallet balance, and mirrors the update into Telegram.
+app.post('/api/explorer/earnings', async (req, res) => {
   try {
-    const { amount, description, timestamp, server } = req.body;
-    
-    if (!amount || isNaN(amount)) {
+    const amount = Number(req.body?.amount);
+    const description = String(req.body?.description || 'Explorer activity').slice(0, 200);
+    const server = String(req.body?.server || 'default').slice(0, 20);
+
+    if (!Number.isFinite(amount) || amount <= 0) {
       return res.status(400).json({ ok: false, error: 'Invalid earnings data' });
     }
 
+    const user = await getUserFromRequest(req);
     const entry = {
       id: crypto.randomUUID(),
       amount,
       description,
-      timestamp: timestamp || new Date().toISOString(),
-      server: server || 'default',
+      timestamp: new Date().toISOString(),
+      server,
       source: 'explorer-workspace',
+      userId: user ? user.id : null,
     };
 
     ledger.push(entry);
 
+    let credited = 0;
+    let wallet = null;
+
+    if (supabaseAdmin) {
+      const { error } = await supabaseAdmin.from('explorer_earnings').insert({
+        user_id: user ? user.id : null,
+        amount,
+        description,
+        server,
+        source: 'explorer-workspace',
+      });
+      if (error) console.warn('[Explorer] Earnings persistence failed:', error.message);
+    }
+
+    if (user && supabaseAdmin) {
+      const { data: binding, error: bindingError } = await supabaseAdmin
+        .from('wallet_bindings')
+        .select('available_balance_usd,pending_balance_usd,solana_address,usdt_address,usdt_network')
+        .eq('user_id', user.id)
+        .maybeSingle();
+      if (!bindingError && binding) {
+        const available = Number((Number(binding.available_balance_usd || 0) + amount).toFixed(6));
+        const { data: updated, error: updateError } = await supabaseAdmin
+          .from('wallet_bindings')
+          .update({ available_balance_usd: available, updated_at: new Date().toISOString() })
+          .eq('user_id', user.id)
+          .select('available_balance_usd,pending_balance_usd,solana_address,usdt_address,usdt_network')
+          .single();
+        if (!updateError && updated) {
+          credited = amount;
+          wallet = updated;
+        }
+      }
+    }
+
+    const totalEarnings = ledger.reduce((sum, e) => sum + (e.amount || 0), 0);
+
+    if (amount >= 0.01) {
+      const balanceLine = wallet
+        ? `Wallet available: $${Number(wallet.available_balance_usd).toFixed(2)}`
+        : 'Bind your wallet in the Explorer to hold funds.';
+      notifyTelegram(
+        `💰 <b>Nexus Explorer earning</b>\n+${amount.toFixed(2)} USD — ${description}\n${balanceLine}`,
+        { throttleKey: `earning:${user ? user.id : 'anon'}` }
+      ).catch(() => {});
+    }
+
     res.json({
       ok: true,
       entry,
-      totalEarnings: ledger.reduce((sum, e) => sum + (e.amount || 0), 0),
+      totalEarnings,
+      credited,
+      wallet,
+      telegramConfigured: telegramConfigured(),
     });
   } catch (error) {
     res.status(500).json({ ok: false, error: 'Failed to record earnings' });
@@ -846,6 +1048,146 @@ app.post('/api/explorer/health', (req, res) => {
   } catch (error) {
     res.status(500).json({ ok: false, error: 'Health check failed' });
   }
+});
+
+// ===== EXPLORER AI — server-side Gemini drafting (the key never reaches the browser) =====
+const GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-flash-lite-latest';
+
+function geminiConfigured() {
+  return !isPlaceholderValue(process.env.GEMINI_API_KEY);
+}
+
+async function callGemini({ systemInstruction, prompt }) {
+  // Try the configured model first; if Google has retired it, the error message
+  // names the recommended replacement — parse it and retry automatically.
+  const models = [GEMINI_MODEL];
+  let lastError = null;
+
+  for (let attempt = 0; attempt < models.length && attempt < 3; attempt++) {
+    const model = models[attempt];
+    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-goog-api-key': process.env.GEMINI_API_KEY },
+      body: JSON.stringify({
+        systemInstruction: { parts: [{ text: systemInstruction }] },
+        contents: [{ role: 'user', parts: [{ text: prompt }] }],
+        generationConfig: { temperature: 0.7, maxOutputTokens: 1024 },
+      }),
+    });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      const message = payload?.error?.message || `Gemini request failed (HTTP ${response.status})`;
+      const recommended = message.match(/models\/([a-z0-9.\-]+)/i);
+      if (recommended && recommended[1] && !models.includes(recommended[1])) {
+        console.warn(`[Gemini] Model ${model} unavailable — retrying with ${recommended[1]}`);
+        models.push(recommended[1]);
+        lastError = new Error(message);
+        continue;
+      }
+      const error = new Error(message);
+      error.status = response.status;
+      throw error;
+    }
+    const text = (payload.candidates?.[0]?.content?.parts || []).map((part) => part.text || '').join('\n').trim();
+    if (!text) throw new Error('Gemini returned an empty response.');
+    return text;
+  }
+  throw lastError || new Error('Gemini request failed.');
+}
+
+function parseDraftText(text) {
+  const jsonMatch = text.match(/\{[\s\S]*\}/);
+  if (jsonMatch) {
+    try {
+      const parsed = JSON.parse(jsonMatch[0]);
+      if (parsed && (parsed.subject || parsed.body)) {
+        return { subject: String(parsed.subject || '').slice(0, 200), body: String(parsed.body || '') };
+      }
+    } catch (_) { /* fall through to raw text below */ }
+  }
+  return { subject: '', body: text };
+}
+
+app.get('/api/explorer/ai/status', (_req, res) => {
+  res.json({ ok: true, configured: geminiConfigured(), model: GEMINI_MODEL, provider: 'google-gemini' });
+});
+
+// Prepare or improve email text on request. Safe when unconfigured: reports
+// configured:false instead of failing, and the key stays on the server.
+app.post('/api/explorer/ai/draft', async (req, res) => {
+  if (!geminiConfigured()) {
+    return res.status(200).json({
+      ok: false,
+      configured: false,
+      message: 'Gemini drafting is not configured on the server yet. Add GEMINI_API_KEY to the server environment (Vercel/Render dashboard or .env) and restart — never put the key in the browser.',
+    });
+  }
+
+  const payload = req.body || {};
+  const prompt = String(payload.prompt || '').trim();
+  const action = String(payload.action || 'draft');
+  if (!prompt && !payload.body) {
+    return res.status(400).json({ ok: false, error: 'Describe what you want the AI to prepare, or provide a draft to improve.' });
+  }
+
+  const systemInstruction = [
+    'You are the Nexus Explorer email drafting assistant inside a mail.com style workspace.',
+    'You prepare, improve, shorten, or formalise email text for the workspace owner.',
+    'Always answer with a JSON object of the shape {"subject": "...", "body": "..."} and nothing else.',
+    'Keep the body plain text, well structured, warm and professional, ready to send.',
+  ].join(' ');
+
+  const parts = [];
+  if (payload.recipients) parts.push(`Recipients: ${payload.recipients}`);
+  if (payload.subject) parts.push(`Current subject: ${payload.subject}`);
+  if (payload.body) parts.push(`Current draft:\n${payload.body}`);
+  parts.push(`Request (${action}): ${prompt || 'improve this draft'}`);
+
+  try {
+    const text = await callGemini({ systemInstruction, prompt: parts.join('\n\n') });
+    const draft = parseDraftText(text);
+    res.json({ ok: true, configured: true, model: GEMINI_MODEL, action, ...draft });
+  } catch (error) {
+    res.status(error.status === 400 ? 400 : 502).json({ ok: false, configured: true, error: error.message });
+  }
+});
+
+// Explorer summary: persisted totals, wallet binding, and Telegram status for the UI.
+app.get('/api/explorer/summary', async (req, res) => {
+  const user = await getUserFromRequest(req);
+  const explorerEntries = ledger.filter((e) => e.source === 'explorer-workspace');
+  let lifetimeUserEarnings = 0;
+  let wallet = null;
+  let earningsPersisted = false;
+
+  if (user && supabaseAdmin) {
+    const { data: earningsRows, error: earningsError } = await supabaseAdmin
+      .from('explorer_earnings').select('amount').eq('user_id', user.id);
+    if (!earningsError && earningsRows) {
+      earningsPersisted = true;
+      lifetimeUserEarnings = earningsRows.reduce((sum, row) => sum + Number(row.amount || 0), 0);
+    }
+    const { data: binding } = await supabaseAdmin
+      .from('wallet_bindings')
+      .select('solana_address,usdt_address,usdt_network,available_balance_usd,pending_balance_usd,updated_at')
+      .eq('user_id', user.id)
+      .maybeSingle();
+    wallet = binding || null;
+  }
+
+  res.json({
+    ok: true,
+    totals: {
+      ledgerTotal: ledger.reduce((sum, e) => sum + (e.amount || 0), 0),
+      explorerTotal: explorerEntries.reduce((sum, e) => sum + (e.amount || 0), 0),
+    },
+    user: user ? { id: user.id, email: user.email, name: user.name } : null,
+    lifetimeUserEarnings,
+    earningsPersisted,
+    wallet,
+    telegram: { configured: telegramConfigured() },
+    updatedAt: new Date().toISOString(),
+  });
 });
 
 // Email sending endpoint
@@ -1049,4 +1391,11 @@ app.use((req, res) => {
   res.status(404).json({ ok: false, path: req.originalUrl, message: 'Route not found.' });
 });
 
-startServer(Number(process.env.PORT) || 8000);
+module.exports = app;
+
+// Start the HTTP listener only when this file is the entry point (local runs,
+// Render, Electron). On Vercel the app is imported by api/index.js as a
+// serverless handler, so binding a port here would break the deployment.
+if (require.main === module) {
+  startServer(Number(process.env.PORT) || 8000);
+}
