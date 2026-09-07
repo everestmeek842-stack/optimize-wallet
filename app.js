@@ -1056,6 +1056,58 @@ render();
 
         // Initialize Solana connection
         initSolana();
+        
+        // ===== AI JEEZE TV AUTOPLAY =====
+        var jezeVid = document.getElementById('nelly-video');
+        if (jezeVid) {
+          jezeVid.muted = false;
+          jezeVid.volume = 0.5;
+          jezeVid.play().catch(function() {
+            jezeVid.muted = true;
+            jezeVid.play().catch(function() {});
+          });
+        }
+        
+        // ===== FIX BROWSER TOGGLE =====
+        var btnApp = document.getElementById('btn-app-view');
+        var btnWeb = document.getElementById('btn-web-view');
+        if (btnApp && btnWeb) {
+          btnApp.onclick = function() {
+            btnApp.classList.add('active');
+            btnWeb.classList.remove('active');
+            var ws = document.getElementById('opt-browser-workspace');
+            if (ws) ws.classList.add('opt-hidden');
+          };
+          btnWeb.onclick = function() {
+            btnWeb.classList.add('active');
+            btnApp.classList.remove('active');
+            var ws = document.getElementById('opt-browser-workspace');
+            if (ws) ws.classList.remove('opt-hidden');
+            var ifr = document.getElementById('browser-iframe');
+            if (ifr && (!ifr.src || ifr.src === 'about:blank' || ifr.src === '')) {
+              ifr.src = 'https://www.google.com';
+            }
+          };
+        }
+        
+        // ===== FIX MEMORY VAULT BUTTON =====
+        var memBtn = document.getElementById('openMemoryButton');
+        var memDialog = document.getElementById('memoryDialog');
+        if (memBtn && memDialog) {
+          memBtn.onclick = function() {
+            if (typeof renderMemoryList === 'function') renderMemoryList();
+            memDialog.showModal();
+          };
+        }
+        
+        // ===== FIX CONNECTIONS BUTTON =====
+        var connBtn = document.getElementById('connectionButton');
+        if (connBtn) {
+          connBtn.onclick = function() {
+            var settingsDialog = document.getElementById('settingsDialog');
+            if (settingsDialog) settingsDialog.showModal();
+          };
+        }
     };
 
     if (document.readyState === 'loading') {

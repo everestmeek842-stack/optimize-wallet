@@ -697,6 +697,65 @@ app.post('/api/auth/register', async (req, res) => {
   }
 });
 
+// Telegram pending verifications store
+const telegramPending = new Map();
+
+// Telegram: Send verification code
+app.post('/api/auth/telegram/send-code', async (req, res) => {
+  const { phone, sessionId } = req.body || {};
+  if (!phone || !sessionId) {
+    return res.status(400).json({ ok: false, error: 'Phone and sessionId are required.' });
+  }
+  // Generate a 5-digit code
+  const code = String(Math.floor(10000 + Math.random() * 90000));
+  telegramPending.set(sessionId, { phone, code, createdAt: Date.now() });
+  // Clean up old entries (older than 10 minutes)
+  const now = Date.now();
+  for (const [key, val] of telegramPending.entries()) {
+    if (now - val.createdAt > 600000) telegramPending.delete(key);
+  }
+  console.log(`[Telegram Auth] Code for ${phone} (session ${sessionId.slice(-6)}): ${code}`);
+  res.json({ ok: true, message: 'Verification code sent.', sessionId });
+});
+
+// Telegram: Verify code and login
+app.post('/api/auth/telegram/verify', async (req, res) => {
+  const { phone, code, sessionId } = req.body || {};
+  if (!phone || !code || !sessionId) {
+    return res.status(400).json({ ok: false, error: 'Phone, code, and sessionId are required.' });
+  }
+  const pending = telegramPending.get(sessionId);
+  if (!pending) {
+    return res.status(400).json({ ok: false, error: 'Session expired. Request a new code.' });
+  }
+  if (pending.phone !== phone) {
+    return res.status(400).json({ ok: false, error: 'Phone number mismatch.' });
+  }
+  if (pending.code !== code) {
+    return res.status(401).json({ ok: false, error: 'Invalid verification code.' });
+  }
+  // Code verified - clean up
+  telegramPending.delete(sessionId);
+  // Create or find user
+  const users = readUsers();
+  const tgUserId = 'tg_' + phone.replace(/[^0-9]/g, '');
+  if (!users[tgUserId]) {
+    users[tgUserId] = {
+      id: tgUserId,
+      name: 'Telegram User',
+      email: '',
+      phone: phone,
+      passwordHash: null,
+      source: 'telegram',
+      createdAt: new Date().toISOString()
+    };
+    writeUsers(users);
+  }
+  const token = crypto.randomBytes(32).toString('hex');
+  sessions[token] = { userId: tgUserId, createdAt: Date.now() };
+  res.cookie('nexus_session', token, { httpOnly: true, maxAge: SESSION_TTL_MS, sameSite: 'lax' });
+  res.json({ ok: true, user: { id: tgUserId, name: users[tgUserId].name, phone }, token });
+});
 app.post('/api/auth/login', async (req, res) => {
   try {
     const payload = req.body || {};
