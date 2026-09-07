@@ -1,5 +1,15 @@
 services:
   - type: web
+    name: nexus-platform
+    env: node
+    buildCommand: npm install
+    startCommand: node server.js
+    envVars:
+      - key: NODE_ENV
+        value: production
+
+services:
+  - type: web
     name: nexus-platform-api
     env: node
     plan: free

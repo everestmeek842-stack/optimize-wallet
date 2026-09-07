@@ -937,6 +937,130 @@ app.post('/api/telegram/alert', async (req, res) => {
   });
 });
 
+// Telegram WebApp initData validation
+// Validates the initData signature using HMAC-SHA256 with the bot token
+app.post('/api/telegram/init', async (req, res) => {
+  const { initData } = req.body || {};
+  
+  if (!initData) {
+    return res.status(400).json({ ok: false, error: 'initData is required.' });
+  }
+
+  const botToken = process.env.TELEGRAM_BOT_TOKEN;
+  if (!botToken) {
+    return res.status(500).json({ ok: false, error: 'TELEGRAM_BOT_TOKEN is not configured on the server.' });
+  }
+
+  try {
+    // Parse initData - it can be a JSON string or an object
+    let parsedData = initData;
+    if (typeof initData === 'string') {
+      try {
+        parsedData = JSON.parse(initData);
+      } catch (e) {
+        // If it's not valid JSON, treat it as a query string
+        parsedData = Object.fromEntries(new URLSearchParams(initData));
+      }
+    }
+
+    // Extract signature from initData
+    const signature = parsedData.signature || parsedData.hash;
+    if (!signature) {
+      return res.status(400).json({ ok: false, error: 'No signature found in initData.' });
+    }
+
+    // Remove signature from data to verify
+    const dataToVerify = { ...parsedData };
+    delete dataToVerify.signature;
+    delete dataToVerify.hash;
+
+    // Create data check string (sorted key-value pairs)
+    const dataCheckString = Object.keys(dataToVerify)
+      .sort()
+      .map(key => `${key}=${dataToVerify[key]}`)
+      .join('\n');
+
+    // Compute HMAC-SHA256 using bot token as key
+    const secretKey = crypto.createHash('sha256').update(botToken).digest();
+    const hmac = crypto.createHmac('sha256', secretKey)
+      .update(dataCheckString)
+      .digest('hex');
+
+    // Compare signatures using timing-safe comparison
+    const signatureBuffer = Buffer.from(signature, 'hex');
+    const hmacBuffer = Buffer.from(hmac, 'hex');
+    
+    const isValid = signatureBuffer.length === hmacBuffer.length && 
+                    crypto.timingSafeEqual(signatureBuffer, hmacBuffer);
+
+    if (!isValid) {
+      return res.status(401).json({ ok: false, error: 'Invalid initData signature.' });
+    }
+
+    // Check timestamp to prevent replay attacks (optional, 24h tolerance)
+    const authDate = parsedData.auth_date;
+    if (authDate) {
+      const authTimestamp = parseInt(authDate, 10);
+      const now = Math.floor(Date.now() / 1000);
+      const maxAge = 24 * 60 * 60; // 24 hours
+      if (now - authTimestamp > maxAge) {
+        return res.status(401).json({ ok: false, error: 'initData has expired.' });
+      }
+    }
+
+    res.json({
+      ok: true,
+      message: 'Telegram WebApp initialized successfully.',
+      user: parsedData.user || null,
+      chat: parsedData.chat || null,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    console.error('[Telegram] initData validation error:', error.message);
+    res.status(500).json({ ok: false, error: 'Failed to validate initData.' });
+  }
+});
+
+// Telegram friends list endpoint
+app.get('/api/telegram/friends', async (_req, res) => {
+  // In a real implementation, this would fetch from Telegram Bot API
+  // or from your database where you store user friendships
+  res.json({
+    ok: true,
+    friends: [
+      { id: '1', name: 'Alice Johnson', username: 'alice_j', online: true, lastSeen: null },
+      { id: '2', name: 'Bob Smith', username: 'bobsmith', online: false, lastSeen: '2 hours ago' },
+      { id: '3', name: 'Charlie Davis', username: 'charlie_d', online: true, lastSeen: null },
+      { id: '4', name: 'Diana Wilson', username: 'diana_w', online: false, lastSeen: '1 day ago' },
+    ]
+  });
+});
+
+// Telegram chat history endpoint
+app.get('/api/telegram/chat/:peerId', async (req, res) => {
+  const { peerId } = req.params;
+  // In a real implementation, this would fetch from your database
+  res.json({
+    ok: true,
+    peerId,
+    messages: [
+      { text: 'Hey! How are you?', fromMe: false, timestamp: new Date(Date.now() - 3600000).toISOString() },
+      { text: 'I\'m good, thanks! Working on the Nexus project.', fromMe: true, timestamp: new Date(Date.now() - 3000000).toISOString() },
+      { text: 'That sounds awesome! Let me know if you need help.', fromMe: false, timestamp: new Date(Date.now() - 2400000).toISOString() },
+    ]
+  });
+});
+
+// Telegram send message endpoint
+app.post('/api/telegram/send-message', async (req, res) => {
+  const { peerId, text } = req.body || {};
+  if (!peerId || !text) {
+    return res.status(400).json({ ok: false, error: 'peerId and text are required.' });
+  }
+  // In a real implementation, this would send via Telegram Bot API
+  res.json({ ok: true, message: { text, fromMe: true, timestamp: new Date().toISOString() } });
+});
+
 app.get('/api/supabase/status', async (_req, res) => {
   if (!supabase) {
     return res.status(200).json({ ok: false, message: 'Supabase is not configured yet.', configured: false });

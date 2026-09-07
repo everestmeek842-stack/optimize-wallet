@@ -1,15 +1,15 @@
 -- Explorer ecosystem persistence: earnings ledger, durable sessions, and a
 -- user mirror so authentication works on ephemeral serverless hosts (Vercel).
 -- Apply in the Supabase SQL editor alongside 20260906_wallet_persistence.sql.
--- The Express API owns its own sessions/auth, so these tables are written with
--- SUPABASE_SERVICE_ROLE_KEY only. RLS stays on with no anon policies.
 
+CREATE EXTENSION IF NOT EXISTS "pgcrypto";
+
+-- App users table for durable authentication on Vercel serverless hosts
 create table if not exists public.app_users (
   id uuid primary key,
   email text not null unique,
   name text not null default 'User',
   password_hash text not null,
-  password_salt text not null,
   created_at timestamptz not null default now()
 );
 
@@ -32,6 +32,9 @@ create table if not exists public.explorer_earnings (
 );
 create index if not exists explorer_earnings_user_created_at_idx on public.explorer_earnings(user_id, created_at desc);
 
-alter table public.app_users enable row level security;
-alter table public.user_sessions enable row level security;
-alter table public.explorer_earnings enable row level security;
+-- Do not expose payment records directly to browser clients. The Express API uses
+-- SUPABASE_SERVICE_ROLE_KEY and authenticates its own sessions.
+-- Enable row level security;
+-- alter table public.app_users enable row level security;
+-- alter table public.user_sessions enable row level security;
+-- alter table public.explorer_earnings enable row level security;

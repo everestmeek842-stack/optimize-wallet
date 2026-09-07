@@ -8,7 +8,9 @@ const requiredFiles = [
   'explorer-workspace.html',
   'explorer-workspace.js',
   'styles.css',
-  'server.js'
+  'server.js',
+  'api/index.js',
+  'supabase-schema.sql'
 ];
 
 for (const file of requiredFiles) {
@@ -18,11 +20,11 @@ for (const file of requiredFiles) {
   }
 }
 
-for (const file of ['server.js', 'explorer-workspace.js', 'deployment-verification.js']) {
+for (const file of ['server.js', 'explorer-workspace.js', 'deployment-verification.js', 'api/index.js']) {
   execFileSync(process.execPath, ['--check', path.join(__dirname, file)], { stdio: 'inherit' });
 }
 
-const sourceFiles = ['package.json', 'server.js', '.env.example', 'render.yaml'];
+const sourceFiles = ['package.json', 'server.js', '.env.example', 'render.yaml', 'api/index.js'];
 const forbiddenSecretPatterns = [
   /(?:AQ\.[A-Za-z0-9_-]{20,}|sk-or-v1-[A-Za-z0-9_-]{20,})/,
   /SUPABASE_SERVICE_ROLE_KEY\s*=\s*["'](?!your-)[^"']+/,
