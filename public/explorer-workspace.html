@@ -1,0 +1,1189 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#0a0a0f" />
+    <title>Nexus Explorer — Unified Workspace</title>
+    <style>
+        /* ===== LUXURY DARK GLASSMORPHISM THEME ===== */
+        :root {
+            color-scheme: dark;
+            --bg: #0a0a0f;
+            --bg-gradient: linear-gradient(160deg, #0a0a0f 0%, #0f0f1a 50%, #1a0f2a 100%);
+            --panel: rgba(255, 255, 255, 0.04);
+            --panel-raised: rgba(255, 255, 255, 0.07);
+            --panel-soft: rgba(255, 255, 255, 0.09);
+            --glass: rgba(255, 255, 255, 0.05);
+            --glass-border: rgba(255, 255, 255, 0.12);
+            --line: rgba(255, 255, 255, 0.08);
+            --line-strong: rgba(255, 255, 255, 0.15);
+            --text: #f0f0f5;
+            --muted: #a0a4b1;
+            --faint: #7a8296;
+            --accent: #d4af37;
+            --accent-gradient: linear-gradient(135deg, #d4af37 0%, #8a2be2 50%, #d4af37 100%);
+            --accent-glow: 0 0 25px rgba(212, 175, 55, 0.25);
+            --accent-glow-strong: 0 0 35px rgba(138, 43, 226, 0.35);
+            --gold: #d4af37;
+            --violet: #8a2be2;
+            --blue: #8bb7ff;
+            --danger: #ff7f7f;
+            --success: #2ecc71;
+            --crypto-gradient: linear-gradient(135deg, #f7931a 0%, #4945ff 50%, #00d4ff 100%);
+            font-family: 'Inter', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            font-size: 15px;
+            line-height: 1.5;
+        }
+
+        * { box-sizing: border-box; }
+        html, body, #root { min-height: 100%; height: 100vh; }
+        html { scroll-behavior: smooth; }
+        body {
+            margin: 0;
+            min-height: 100vh;
+            height: 100vh;
+            overflow: hidden;
+            background: var(--bg-gradient);
+            color: var(--text);
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+
+        button, input, textarea, select { font: inherit; }
+        button { border: 0; cursor: pointer; }
+        button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-visible {
+            outline: 2px solid var(--accent);
+            outline-offset: 2px;
+        }
+
+        /* ===== GLASSMORPHISM ===== */
+        .glass {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+        }
+        .glass-strong {
+            background: rgba(255, 255, 255, 0.08);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            backdrop-filter: blur(24px);
+            -webkit-backdrop-filter: blur(24px);
+        }
+        .accent-glow {
+            box-shadow: 0 0 25px rgba(212, 175, 55, 0.25);
+        }
+        .accent-glow:hover {
+            box-shadow: 0 0 35px rgba(138, 43, 226, 0.35);
+        }
+
+        /* ===== EXPLORER SHELL ===== */
+        .explorer-shell {
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            background: var(--bg-gradient);
+        }
+
+        .explorer-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 16px 24px;
+            background: rgba(255, 255, 255, 0.03);
+            border-bottom: 1px solid var(--glass-border);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            flex-wrap: wrap;
+            gap: 12px;
+        }
+
+        .explorer-brand {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            flex: 1;
+            min-width: 200px;
+        }
+
+        .explorer-brand-icon {
+            width: 36px;
+            height: 36px;
+            background: var(--accent-gradient);
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            font-size: 18px;
+            box-shadow: var(--accent-glow);
+        }
+
+        .explorer-brand-text h1 {
+            margin: 0;
+            font-size: 18px;
+            font-weight: 700;
+            background: var(--accent-gradient);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .explorer-brand-text p {
+            margin: 0;
+            font-size: 12px;
+            color: var(--muted);
+        }
+
+        .explorer-controls {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            flex-wrap: wrap;
+        }
+
+        .earnings-display {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 16px;
+            background: rgba(247, 147, 26, 0.1);
+            border: 1px solid rgba(247, 147, 26, 0.3);
+            border-radius: 8px;
+            font-size: 13px;
+            font-weight: 600;
+            color: #f7931a;
+        }
+
+        .earnings-display small {
+            color: var(--muted);
+            font-weight: 400;
+        }
+
+        .state-switcher {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 12px;
+            background: var(--glass);
+            border: 1px solid var(--glass-border);
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .state-switcher:hover {
+            background: var(--glass-strong);
+            border-color: var(--accent);
+        }
+
+        .state-switcher-label {
+            font-size: 12px;
+            color: var(--muted);
+        }
+
+        .state-switcher-value {
+            font-weight: 600;
+            color: var(--text);
+            font-size: 13px;
+        }
+
+        .explorer-tabs {
+            display: flex;
+            gap: 4px;
+            padding: 12px 24px;
+            background: rgba(255, 255, 255, 0.02);
+            border-bottom: 1px solid var(--line);
+            overflow-x: auto;
+        }
+
+        .explorer-tabs::-webkit-scrollbar {
+            height: 4px;
+        }
+
+        .explorer-tabs::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        .explorer-tabs::-webkit-scrollbar-thumb {
+            background: rgba(212, 175, 55, 0.3);
+            border-radius: 4px;
+        }
+
+        .tab-button {
+            padding: 10px 20px;
+            background: transparent;
+            border: 1px solid transparent;
+            color: var(--muted);
+            border-radius: 6px;
+            cursor: pointer;
+            white-space: nowrap;
+            transition: all 0.2s;
+            font-weight: 500;
+            font-size: 14px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .tab-button:hover {
+            background: rgba(255, 255, 255, 0.04);
+            border-color: var(--glass-border);
+            color: var(--text);
+        }
+
+        .tab-button.active {
+            background: var(--accent-gradient);
+            border-color: var(--accent);
+            color: #000;
+            font-weight: 700;
+            box-shadow: var(--accent-glow);
+        }
+
+        .tab-badge {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 20px;
+            height: 20px;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 700;
+        }
+
+        .tab-badge.active {
+            background: rgba(0, 0, 0, 0.3);
+            color: #000;
+        }
+
+        .explorer-content {
+            flex: 1;
+            overflow: hidden;
+            display: flex;
+        }
+
+        .tab-panel {
+            flex: 1;
+            display: none;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .tab-panel.active {
+            display: flex;
+        }
+
+        .tab-panel-content {
+            flex: 1;
+            overflow-y: auto;
+            padding: 24px;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .tab-panel-content::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        .tab-panel-content::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        .tab-panel-content::-webkit-scrollbar-thumb {
+            background: rgba(212, 175, 55, 0.3);
+            border-radius: 4px;
+        }
+
+        .section {
+            background: var(--panel-raised);
+            border: 1px solid var(--line-strong);
+            border-radius: 12px;
+            padding: 20px;
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+        }
+
+        .section-title {
+            font-size: 16px;
+            font-weight: 700;
+            margin: 0 0 16px;
+            color: var(--text);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .section-title small {
+            background: rgba(212, 175, 55, 0.2);
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 600;
+            color: var(--accent);
+        }
+
+        .form-group {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            margin-bottom: 16px;
+        }
+
+        .form-group label {
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--muted);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .form-group input,
+        .form-group textarea,
+        .form-group select {
+            padding: 12px 16px;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            border-radius: 8px;
+            color: var(--text);
+            font-size: 14px;
+        }
+
+        .form-group textarea {
+            min-height: 120px;
+            resize: vertical;
+        }
+
+        .form-group input:focus,
+        .form-group textarea:focus,
+        .form-group select:focus {
+            background: rgba(255, 255, 255, 0.08);
+            border-color: var(--accent);
+            box-shadow: 0 0 20px rgba(212, 175, 55, 0.1);
+        }
+
+        .btn {
+            padding: 12px 24px;
+            background: var(--accent-gradient);
+            border: 1px solid var(--accent);
+            border-radius: 8px;
+            color: #000;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.2s;
+            box-shadow: var(--accent-glow);
+            font-size: 14px;
+        }
+
+        .btn:hover {
+            box-shadow: var(--accent-glow-strong);
+            transform: translateY(-1px);
+        }
+
+        .btn:active {
+            transform: translateY(0);
+        }
+
+        .btn-secondary {
+            background: rgba(255, 255, 255, 0.08);
+            border-color: var(--glass-border);
+            color: var(--text);
+            box-shadow: none;
+        }
+
+        .btn-secondary:hover {
+            background: rgba(255, 255, 255, 0.12);
+            box-shadow: none;
+        }
+
+        .grid-2 {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 16px;
+        }
+
+        .card {
+            background: var(--panel-soft);
+            border: 1px solid var(--line);
+            border-radius: 10px;
+            padding: 16px;
+            backdrop-filter: blur(15px);
+            -webkit-backdrop-filter: blur(15px);
+            transition: all 0.2s;
+            cursor: pointer;
+        }
+
+        .card:hover {
+            background: var(--panel-raised);
+            border-color: var(--accent);
+            box-shadow: var(--accent-glow);
+        }
+
+        .card-title {
+            font-weight: 700;
+            font-size: 14px;
+            margin: 0 0 8px;
+            color: var(--text);
+        }
+
+        .card-desc {
+            font-size: 13px;
+            color: var(--muted);
+            margin: 0 0 12px;
+        }
+
+        .card-stat {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding-top: 12px;
+            border-top: 1px solid var(--line);
+        }
+
+        .card-stat-label {
+            font-size: 12px;
+            color: var(--faint);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .card-stat-value {
+            font-weight: 700;
+            font-size: 15px;
+            color: var(--success);
+        }
+
+        .status-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 12px;
+            background: rgba(46, 204, 113, 0.15);
+            border: 1px solid rgba(46, 204, 113, 0.3);
+            border-radius: 6px;
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--success);
+        }
+
+        .status-badge.warning {
+            background: rgba(255, 193, 7, 0.15);
+            border-color: rgba(255, 193, 7, 0.3);
+            color: #ffc107;
+        }
+
+        .status-badge.error {
+            background: rgba(255, 127, 127, 0.15);
+            border-color: rgba(255, 127, 127, 0.3);
+            color: var(--danger);
+        }
+
+        .status-indicator {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--success);
+            animation: pulse 2s infinite;
+        }
+
+        .status-indicator.warning {
+            background: #ffc107;
+        }
+
+        .status-indicator.error {
+            background: var(--danger);
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .list {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .list-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px;
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid var(--line);
+            border-radius: 8px;
+            transition: all 0.2s;
+        }
+
+        .list-item:hover {
+            background: rgba(255, 255, 255, 0.07);
+        }
+
+        .list-item-content {
+            flex: 1;
+        }
+
+        .list-item-title {
+            font-weight: 600;
+            font-size: 14px;
+            color: var(--text);
+            margin: 0 0 4px;
+        }
+
+        .list-item-desc {
+            font-size: 12px;
+            color: var(--muted);
+            margin: 0;
+        }
+
+        .list-item-action {
+            display: flex;
+            gap: 8px;
+        }
+
+        .list-item-badge {
+            padding: 4px 10px;
+            background: rgba(212, 175, 55, 0.15);
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 600;
+            color: var(--accent);
+        }
+
+        .tabs-icon::before {
+            content: '📧'; /* Mail */
+        }
+        .tab-button[data-tab="mail"] .tabs-icon::before { content: '📧'; }
+        .tab-button[data-tab="ai"] .tabs-icon::before { content: '🤖'; }
+        .tab-button[data-tab="pdf"] .tabs-icon::before { content: '📄'; }
+        .tab-button[data-tab="config"] .tabs-icon::before { content: '⚙️'; }
+        .tab-button[data-tab="wallet"] .tabs-icon::before { content: '💳'; }
+
+        .earning-ticker {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            font-size: 12px;
+            color: #f7931a;
+            font-weight: 600;
+        }
+
+        .earning-ticker-value {
+            display: inline-block;
+            min-width: 60px;
+            text-align: right;
+        }
+
+        .workflow-recorder {
+            position: relative;
+        }
+
+        .recorder-status {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 14px;
+            background: rgba(255, 0, 0, 0.1);
+            border: 1px solid rgba(255, 0, 0, 0.3);
+            border-radius: 6px;
+            font-size: 13px;
+            color: var(--danger);
+            margin-bottom: 12px;
+        }
+
+        .recorder-status.inactive {
+            background: rgba(46, 204, 113, 0.1);
+            border-color: rgba(46, 204, 113, 0.3);
+            color: var(--success);
+        }
+
+        .record-button {
+            background: #ff4444;
+            padding: 12px 24px;
+            color: #fff;
+            border: 1px solid #ff6666;
+            border-radius: 8px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .record-button:hover {
+            background: #ff2222;
+            box-shadow: 0 0 20px rgba(255, 68, 68, 0.4);
+        }
+
+        .record-button.recording {
+            animation: record-pulse 1s infinite;
+        }
+
+        @keyframes record-pulse {
+            0%, 100% { box-shadow: 0 0 20px rgba(255, 68, 68, 0.4); }
+            50% { box-shadow: 0 0 30px rgba(255, 68, 68, 0.7); }
+        }
+
+        .monetization-meter {
+            display: flex;
+            gap: 8px;
+            padding: 12px;
+            background: linear-gradient(135deg, rgba(247, 147, 26, 0.1) 0%, rgba(73, 69, 255, 0.1) 100%);
+            border: 1px solid rgba(247, 147, 26, 0.2);
+            border-radius: 8px;
+            font-size: 13px;
+        }
+
+        .monetization-meter-label {
+            flex: 1;
+            color: var(--muted);
+        }
+
+        .monetization-meter-value {
+            font-weight: 700;
+            background: var(--crypto-gradient);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .loading-skeleton {
+            background: linear-gradient(90deg, rgba(255,255,255,0.05) 25%, rgba(255,255,255,0.1) 50%, rgba(255,255,255,0.05) 75%);
+            background-size: 200% 100%;
+            animation: loading 1.5s infinite;
+        }
+
+        @keyframes loading {
+            0% { background-position: 200% 0; }
+            100% { background-position: -200% 0; }
+        }
+
+        .empty-state {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 60px 20px;
+            text-align: center;
+            color: var(--muted);
+        }
+
+        .empty-state-icon {
+            font-size: 48px;
+            margin-bottom: 16px;
+            opacity: 0.5;
+        }
+
+        .empty-state-title {
+            font-size: 18px;
+            font-weight: 700;
+            color: var(--text);
+            margin-bottom: 8px;
+        }
+
+        .empty-state-desc {
+            font-size: 14px;
+            margin-bottom: 24px;
+            max-width: 300px;
+        }
+
+        /* ===== APP-LIKE FIXED LAYOUT — the page itself never scrolls ===== */
+        html, body { overscroll-behavior: none; }
+        .mail-workspace {
+            flex: 1;
+            min-height: 0;
+            display: grid;
+            grid-template-columns: minmax(0, 1.15fr) minmax(0, 0.85fr);
+            gap: 16px;
+            padding: 20px;
+        }
+        .mail-left, .mail-right { min-height: 0; display: flex; flex-direction: column; gap: 16px; }
+        .mail-compose-section { flex: 0 0 auto; }
+        .mail-history-section { flex: 1 1 auto; min-height: 120px; }
+        .mail-history-section .list { max-height: none; overflow-y: auto; min-height: 0; }
+        @media (max-width: 1100px) {
+            .mail-workspace { grid-template-columns: 1fr; overflow-y: auto; }
+            .mail-left, .mail-right { min-height: auto; }
+        }
+
+        /* AI chat inside mail.com */
+        .ai-chat-card { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+        .ai-status-row { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; flex-wrap: wrap; }
+        .ai-status-note { font-size: 11px; color: var(--faint); }
+        .ai-chat-messages { flex: 1; min-height: 160px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; padding-right: 4px; }
+        .ai-chat-messages::-webkit-scrollbar { width: 6px; }
+        .ai-chat-messages::-webkit-scrollbar-thumb { background: rgba(212, 175, 55, 0.3); border-radius: 4px; }
+        .chat-msg { max-width: 88%; padding: 10px 14px; border-radius: 12px; font-size: 13.5px; line-height: 1.55; white-space: pre-wrap; word-break: break-word; }
+        .chat-msg.user { align-self: flex-end; background: rgba(138, 43, 226, 0.22); border: 1px solid rgba(138, 43, 226, 0.4); }
+        .chat-msg.assistant { align-self: flex-start; background: rgba(255, 255, 255, 0.05); border: 1px solid var(--line); }
+        .chat-msg.system { align-self: center; background: rgba(255, 193, 7, 0.08); border: 1px solid rgba(255, 193, 7, 0.3); color: #ffc107; font-size: 12.5px; }
+        .chat-msg.thinking { color: var(--muted); font-style: italic; }
+        .chat-draft { margin-top: 10px; padding-top: 10px; border-top: 1px dashed var(--line-strong); }
+        .chat-draft-subject { font-weight: 700; color: var(--accent); margin: 0 0 6px; font-size: 13px; }
+        .chat-draft-actions { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
+        .chat-mini-btn { padding: 6px 12px; font-size: 12px; border-radius: 6px; background: rgba(212, 175, 55, 0.15); border: 1px solid rgba(212, 175, 55, 0.4); color: var(--accent); font-weight: 600; }
+        .chat-mini-btn:hover { background: rgba(212, 175, 55, 0.28); }
+        .ai-quick-row { display: flex; gap: 8px; flex-wrap: wrap; margin: 12px 0; }
+        .chip { padding: 6px 12px; font-size: 12px; border-radius: 999px; background: rgba(255, 255, 255, 0.06); border: 1px solid var(--line-strong); color: var(--muted); }
+        .chip:hover { border-color: var(--accent); color: var(--text); }
+        .ai-input-row { display: flex; gap: 10px; align-items: flex-end; margin-top: auto; }
+        .ai-input-row textarea { flex: 1; min-height: 64px; max-height: 120px; resize: none; padding: 10px 14px; background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 10px; color: var(--text); font-size: 13.5px; }
+        .ai-input-row textarea:focus { outline: none; border-color: var(--accent); }
+
+        /* Wallet & funds */
+        .wallet-status-row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+        .wallet-inline-status { font-size: 12.5px; color: var(--muted); margin-left: 10px; }
+        .wallet-address { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11px; color: var(--faint); word-break: break-all; }
+
+        /* Toast notifications */
+        .toast-stack { position: fixed; right: 18px; bottom: 18px; display: flex; flex-direction: column; gap: 8px; z-index: 9999; }
+        .toast { padding: 12px 16px; border-radius: 10px; background: rgba(18, 18, 28, 0.96); border: 1px solid var(--accent); color: var(--text); font-size: 13px; box-shadow: 0 8px 30px rgba(0, 0, 0, 0.5); max-width: 360px; animation: toast-in 0.22s ease; }
+        .toast.success { border-color: var(--success); }
+        .toast.error { border-color: var(--danger); }
+        @keyframes toast-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+    </style>
+</head>
+<body>
+    <div class="explorer-shell">
+        <!-- Header -->
+        <div class="explorer-header">
+            <div class="explorer-brand">
+                <div class="explorer-brand-icon">🚀</div>
+                <div class="explorer-brand-text">
+                    <h1>Nexus Explorer</h1>
+                    <p>Unified Workspace Ecosystem</p>
+                </div>
+                <button class="tab-button" type="button" id="backToWorkspaceBtn" aria-label="Return to AI workspace">Back to workspace</button>
+            </div>
+            <div class="explorer-controls">
+                <div class="earnings-display">
+                    <small>Real-time Earnings:</small>
+                    <span class="earning-ticker">
+                        <span>💰</span>
+                        <span class="earning-ticker-value" id="earningsValue">$0.00</span>
+                        <span id="earningsPerSecond" style="font-size: 11px; color: #f7931a;">+$0.00/s</span>
+                    </span>
+                </div>
+                <div class="state-switcher" id="stateSwitcher">
+                    <span class="state-switcher-label">SERVER:</span>
+                    <span class="state-switcher-value" id="currentState">NY</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tabs -->
+        <div class="explorer-tabs">
+            <button class="tab-button active" data-tab="mail">
+                <span class="tabs-icon"></span>
+                mail.com Interface
+                <span class="tab-badge active">1</span>
+            </button>
+            <button class="tab-button" data-tab="ai">
+                <span class="tabs-icon"></span>
+                AI Assistant
+                <span class="tab-badge">2</span>
+            </button>
+            <button class="tab-button" data-tab="pdf">
+                <span class="tabs-icon"></span>
+                PDF Processing
+                <span class="tab-badge">3</span>
+            </button>
+            <button class="tab-button" data-tab="config">
+                <span class="tabs-icon"></span>
+                Configuration
+                <span class="tab-badge">4</span>
+            </button>
+            <button class="tab-button" data-tab="wallet">
+                <span class="tabs-icon"></span>
+                💳 Wallet &amp; Funds
+                <span class="tab-badge">5</span>
+            </button>
+        </div>
+
+        <!-- Content -->
+        <div class="explorer-content">
+            <!-- MAIL TAB — MAIN INTERFACE (compose + AI drafting inside) -->
+            <div class="tab-panel active" id="mail-panel">
+                <div class="mail-workspace">
+                    <div class="mail-left">
+                        <div class="section mail-compose-section">
+                        <h2 class="section-title">📧 Mail.com Interface <small>Direct Communication Hub</small></h2>
+                        <div class="form-group">
+                            <label>Recipient Email(s)</label>
+                            <textarea id="recipientEmails" placeholder="recipient@example.com&#10;multiple@recipients.com" style="height: 80px;"></textarea>
+                        </div>
+                        <div class="form-group">
+                            <label>Subject Line</label>
+                            <input type="text" id="emailSubject" placeholder="Email subject line" />
+                        </div>
+                        <div class="form-group">
+                            <label>Email Content</label>
+                            <textarea id="emailBody" placeholder="Compose your email content here..."></textarea>
+                        </div>
+                        <div class="monetization-meter" style="margin-bottom: 16px;">
+                            <span class="monetization-meter-label">💸 Earnings on Send:</span>
+                            <span class="monetization-meter-value" id="emailEarnings">+$0.05</span>
+                        </div>
+                        <button class="btn" id="sendEmailBtn">Send Email</button>
+                    </div>
+
+                        <div class="section mail-history-section">
+                        <h2 class="section-title">✉️ Email History <small>Recent Communications</small></h2>
+                        <div class="list" id="emailHistory">
+                            <div class="empty-state">
+                                <div class="empty-state-icon">📪</div>
+                                <div class="empty-state-title">No Emails Sent Yet</div>
+                                <div class="empty-state-desc">Start by composing and sending your first email</div>
+                            </div>
+                        </div>
+                        </div>
+                    </div>
+
+                    <div class="mail-right">
+                        <div class="section ai-chat-card" id="aiChatCard">
+                            <h2 class="section-title">🤖 AI Drafting Assistant <small>Gemini · Inside mail.com</small></h2>
+                            <div class="ai-status-row">
+                                <span class="status-badge warning" id="aiStatusChip"><span class="status-indicator warning"></span>Checking server…</span>
+                                <span class="ai-status-note">Key lives on the server — never in your browser</span>
+                            </div>
+                            <div class="ai-chat-messages" id="aiChatMessages">
+                                <div class="chat-msg assistant">Hello! Ask me to prepare text for your email — for example “Prepare a short professional email introducing my services”. I will write it here and you can insert it into your email with one click.</div>
+                            </div>
+                            <div class="ai-quick-row" id="aiQuickPrompts">
+                                <button class="chip" type="button" data-prompt="Write a short professional introduction email presenting myself and asking for a meeting.">✉️ Introduction</button>
+                                <button class="chip" type="button" data-prompt="Write a polite follow-up email asking for an update on my previous message.">🔁 Follow-up</button>
+                                <button class="chip" type="button" data-prompt="Write a warm thank-you email after a successful meeting and payment.">🙏 Thank-you</button>
+                                <button class="chip" type="button" data-action="improve" data-prompt="Improve and polish my current email draft.">✨ Improve draft</button>
+                                <button class="chip" type="button" data-action="shorten" data-prompt="Make my current email draft shorter and clearer.">✂️ Shorten</button>
+                            </div>
+                            <div class="ai-input-row">
+                                <textarea id="aiChatInput" placeholder="Ask the AI to prepare text for you… e.g. “Prepare a payment reminder email for a client” (Ctrl+Enter to send)"></textarea>
+                                <button class="btn" id="aiChatSendBtn">Prepare</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- AI ASSISTANT TAB -->
+            <div class="tab-panel" id="ai-panel">
+                <div class="tab-panel-content">
+                    <div class="section">
+                        <h2 class="section-title">🤖 AI Workflow Recorder <small>Learn Your Process</small></h2>
+                        <div class="recorder-status inactive" id="recorderStatus">
+                            <span class="status-indicator"></span>
+                            Ready to record your workflow
+                        </div>
+                        <button class="record-button" id="recordBtn">▶ Start Recording</button>
+                        <p style="font-size: 12px; color: var(--muted); margin-top: 12px; text-align: center;">
+                            Record your email sending workflow once. AI learns and automates it forever.
+                        </p>
+                    </div>
+
+                    <div class="section">
+                        <h2 class="section-title">🧠 Memory Vault Integration <small>AI Learning System</small></h2>
+                        <div class="form-group">
+                            <label>Bulk Email Recipients (Paste List)</label>
+                            <textarea id="bulkRecipients" placeholder="Paste comma or line-separated email list here..." style="height: 100px;"></textarea>
+                        </div>
+                        <div class="form-group">
+                            <label>Email Template</label>
+                            <select id="emailTemplate">
+                                <option value="">-- Select Template --</option>
+                                <option value="newsletter">Newsletter Template</option>
+                                <option value="announcement">Announcement</option>
+                                <option value="personal">Personal Message</option>
+                                <option value="followup">Follow-up</option>
+                            </select>
+                        </div>
+                        <div class="monetization-meter" style="margin-bottom: 16px;">
+                            <span class="monetization-meter-label">💸 Bulk Send Earnings:</span>
+                            <span class="monetization-meter-value" id="bulkEarnings">+$2.50</span>
+                        </div>
+                        <button class="btn" id="bulkSendBtn">Execute Bulk Send</button>
+                    </div>
+
+                    <div class="section">
+                        <h2 class="section-title">📊 AI Learning Progress <small>Workflow Training</small></h2>
+                        <div class="grid-2">
+                            <div class="card">
+                                <h3 class="card-title">Patterns Learned</h3>
+                                <p class="card-desc">Automated workflows recognized</p>
+                                <div class="card-stat">
+                                    <span class="card-stat-label">Total</span>
+                                    <span class="card-stat-value" id="learnedPatterns">0</span>
+                                </div>
+                            </div>
+                            <div class="card">
+                                <h3 class="card-title">Automation Rate</h3>
+                                <p class="card-desc">Successfully executed tasks</p>
+                                <div class="card-stat">
+                                    <span class="card-stat-label">Success Rate</span>
+                                    <span class="card-stat-value" id="automationRate">0%</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- PDF PROCESSING TAB -->
+            <div class="tab-panel" id="pdf-panel">
+                <div class="tab-panel-content">
+                    <div class="section">
+                        <h2 class="section-title">📄 PDF Document Generator <small>Create & Process</small></h2>
+                        <div class="form-group">
+                            <label>Document Type</label>
+                            <select id="pdfDocType">
+                                <option value="">-- Select Document Type --</option>
+                                <option value="invoice">Invoice</option>
+                                <option value="report">Business Report</option>
+                                <option value="contract">Contract</option>
+                                <option value="certificate">Certificate</option>
+                                <option value="proposal">Proposal</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Document Title</label>
+                            <input type="text" id="pdfTitle" placeholder="Enter document title" />
+                        </div>
+                        <div class="form-group">
+                            <label>Document Content</label>
+                            <textarea id="pdfContent" placeholder="Enter document content..." style="height: 150px;"></textarea>
+                        </div>
+                        <div class="monetization-meter" style="margin-bottom: 16px;">
+                            <span class="monetization-meter-label">💸 PDF Generation:</span>
+                            <span class="monetization-meter-value" id="pdfEarnings">+$0.10</span>
+                        </div>
+                        <button class="btn" id="generatePdfBtn">Generate PDF</button>
+                    </div>
+
+                    <div class="section">
+                        <h2 class="section-title">📦 Batch PDF Processing <small>Multiple Documents</small></h2>
+                        <div class="form-group">
+                            <label>Upload Files or Paste Data</label>
+                            <textarea id="batchPdfData" placeholder="Paste multiple document data..." style="height: 120px;"></textarea>
+                        </div>
+                        <div class="monetization-meter" style="margin-bottom: 16px;">
+                            <span class="monetization-meter-label">💸 Batch Processing:</span>
+                            <span class="monetization-meter-value" id="batchPdfEarnings">+$0.50</span>
+                        </div>
+                        <button class="btn" id="processBatchPdfBtn">Process Batch</button>
+                    </div>
+
+                    <div class="section">
+                        <h2 class="section-title">📋 Recent Documents <small>Generated PDFs</small></h2>
+                        <div class="list" id="pdfList">
+                            <div class="empty-state">
+                                <div class="empty-state-icon">📄</div>
+                                <div class="empty-state-title">No Documents Yet</div>
+                                <div class="empty-state-desc">Generate your first PDF document</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- CONFIGURATION TAB -->
+            <div class="tab-panel" id="config-panel">
+                <div class="tab-panel-content">
+                    <div class="section">
+                        <h2 class="section-title">🗺️ US Server Configuration <small>Geographic Routing</small></h2>
+                        <div class="form-group">
+                            <label>Active Server Region</label>
+                            <select id="serverRegion">
+                                <option value="ny">New York (NY)</option>
+                                <option value="ca">California (CA)</option>
+                                <option value="tx">Texas (TX)</option>
+                                <option value="fl">Florida (FL)</option>
+                                <option value="wa">Washington (WA)</option>
+                            </select>
+                        </div>
+                        <div class="grid-2" style="margin-top: 16px;">
+                            <div class="card">
+                                <h3 class="card-title">Current Server</h3>
+                                <p class="card-desc">Active region</p>
+                                <div class="card-stat">
+                                    <span class="card-stat-label">Location</span>
+                                    <span class="card-stat-value" id="activeServerLocation">NY</span>
+                                </div>
+                            </div>
+                            <div class="card">
+                                <h3 class="card-title">Latency</h3>
+                                <p class="card-desc">Network response time</p>
+                                <div class="card-stat">
+                                    <span class="card-stat-label">Avg Latency</span>
+                                    <span class="card-stat-value" id="latencyValue">12ms</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="section">
+                        <h2 class="section-title">⚙️ Port Configuration <small>Dual-Port Setup</small></h2>
+                        <div class="grid-2">
+                            <div class="card">
+                                <h3 class="card-title">Local Workspace</h3>
+                                <p class="card-desc">Development & testing</p>
+                                <div class="card-stat">
+                                    <span class="card-stat-label">Port</span>
+                                    <span class="card-stat-value">4000</span>
+                                </div>
+                                <div style="margin-top: 12px;">
+                                    <span class="status-badge">
+                                        <span class="status-indicator"></span>
+                                        Active
+                                    </span>
+                                </div>
+                            </div>
+                            <div class="card">
+                                <h3 class="card-title">External Testing</h3>
+                                <p class="card-desc">Production testing</p>
+                                <div class="card-stat">
+                                    <span class="card-stat-label">Port</span>
+                                    <span class="card-stat-value">8000</span>
+                                </div>
+                                <div style="margin-top: 12px;">
+                                    <span class="status-badge">
+                                        <span class="status-indicator"></span>
+                                        Active
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="section">
+                        <h2 class="section-title">🔒 Email Security <small>Access & Authentication</small></h2>
+                        <div class="form-group">
+                            <label>Email Service Provider</label>
+                            <select id="emailProvider">
+                                <option value="">-- Select Provider --</option>
+                                <option value="smtp">SMTP Server</option>
+                                <option value="mailgun">Mailgun</option>
+                                <option value="sendgrid">SendGrid</option>
+                                <option value="mailchimp">Mailchimp</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>API Key (Encrypted)</label>
+                            <input type="password" id="apiKey" placeholder="Your secure API key" />
+                        </div>
+                        <button class="btn" id="testConnectionBtn">Test Connection</button>
+                        <div id="connectionStatus" style="margin-top: 16px; display: none;">
+                            <div class="status-badge">
+                                <span class="status-indicator"></span>
+                                Connection Verified
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="section">
+                        <h2 class="section-title">💰 Monetization Strategies <small>15 Revenue Engines</small></h2>
+                        <div id="strategiesList" class="list" style="max-height: 300px; overflow-y: auto;">
+                            <!-- Generated by JS -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- WALLET & FUNDS TAB -->
+            <div class="tab-panel" id="wallet-panel">
+                <div class="tab-panel-content">
+                    <div class="section">
+                        <h2 class="section-title">💳 Wallet &amp; Funds <small>Bind · Earn · Withdraw</small></h2>
+                        <div class="wallet-status-row">
+                            <span class="status-badge warning" id="walletAuthStatus"><span class="status-indicator warning"></span>Checking login…</span>
+                            <span class="status-badge warning" id="walletTelegramStatus"><span class="status-indicator warning"></span>Telegram: checking…</span>
+                            <a class="btn btn-secondary" id="walletLoginLink" href="/login" style="display:none;">Log in / Register</a>
+                            <button class="btn btn-secondary" id="walletRefreshBtn" type="button">Refresh</button>
+                        </div>
+                        <div class="grid-2" style="margin-top: 16px;">
+                            <div class="card">
+                                <h3 class="card-title">Available Balance</h3>
+                                <p class="card-desc">Cleared funds held in your bound wallet</p>
+                                <div class="card-stat"><span class="card-stat-label">USD</span><span class="card-stat-value" id="walletAvailable">$0.00</span></div>
+                            </div>
+                            <div class="card">
+                                <h3 class="card-title">Pending Balance</h3>
+                                <p class="card-desc">Earnings under review</p>
+                                <div class="card-stat"><span class="card-stat-label">USD</span><span class="card-stat-value" id="walletPending">$0.00</span></div>
+                            </div>
+                            <div class="card">
+                                <h3 class="card-title">Lifetime Explorer Earnings</h3>
+                                <p class="card-desc">Everything this workspace earned (persisted in Supabase)</p>
+                                <div class="card-stat"><span class="card-stat-label">USD</span><span class="card-stat-value" id="walletLifetime">$0.00</span></div>
+                            </div>
+                            <div class="card">
+                                <h3 class="card-title">Master Treasury</h3>
+                                <p class="card-desc">Settlement treasury for payouts</p>
+                                <div class="card-stat"><span class="card-stat-label">Network</span><span class="card-stat-value" id="walletNetwork">SOLANA</span></div>
+                                <div class="wallet-address" id="walletMasterAddress" style="margin-top: 8px;"></div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="section">
+                        <h2 class="section-title">🔐 Bind Your Wallet <small>SOL + USDT payout addresses</small></h2>
+                        <div class="form-group">
+                            <label>Solana Wallet Address (SOL)</label>
+                            <input type="text" id="walletSolanaAddress" placeholder="Your Solana address (32–44 characters)" />
+                        </div>
+                        <div class="form-group">
+                            <label>USDT Network</label>
+                            <select id="walletUsdtNetwork">
+                                <option value="TRC20">TRC20 (TRON)</option>
+                                <option value="SPL">SPL (Solana)</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>USDT Payout Address</label>
+                            <input type="text" id="walletUsdtAddress" placeholder="TRON (T…) or Solana address that receives USDT" />
+                        </div>
+                        <div style="display:flex; align-items:center;">
+                            <button class="btn" id="saveWalletBtn">Save Wallet Binding</button>
+                            <span class="wallet-inline-status" id="walletSaveStatus"></span>
+                        </div>
+                    </div>
+
+                    <div class="section">
+                        <h2 class="section-title">🏧 Access Your Funds <small>Withdraw &amp; claim</small></h2>
+                        <div class="grid-2">
+                            <div>
+                                <div class="form-group">
+                                    <label>Withdraw Amount (USD)</label>
+                                    <input type="number" id="withdrawAmount" min="1" step="0.01" placeholder="1.00" />
+                                </div>
+                                <div class="form-group">
+                                    <label>Asset</label>
+                                    <select id="withdrawAsset">
+                                        <option value="USDT">USDT</option>
+                                        <option value="SOL">SOL</option>
+                                    </select>
+                                </div>
+                                <button class="btn" id="withdrawBtn">Request Withdrawal</button>
+                            </div>
+                            <div>
+                                <p class="card-desc">Airdrop claim: $1–$5 per request with a short cooldown. Requests are recorded for authorized review before any payout is sent.</p>
+                                <div class="form-group">
+                                    <label>Claim Amount (USD)</label>
+                                    <input type="number" id="claimAmount" min="1" max="5" step="1" value="1" />
+                                </div>
+                                <button class="btn btn-secondary" id="claimBtn">Request Claim</button>
+                            </div>
+                        </div>
+                        <div class="list" id="walletRequests" style="margin-top: 16px;">
+                            <div class="empty-state">
+                                <div class="empty-state-icon">🧾</div>
+                                <div class="empty-state-title">No Requests Yet</div>
+                                <div class="empty-state-desc">Withdrawal and claim requests will appear here</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="explorer-workspace.js"></script>
+</body>
+</html>

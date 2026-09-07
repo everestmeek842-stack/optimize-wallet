@@ -1,0 +1,19 @@
+android/
+build_outputs/
+data/
+scripts/
+New folder/
+supabase/
+*.md
+*.txt
+*.bak*
+*.cjs
+*.bat
+*.ps1
+SREYMARA_V3.6_BACKUP.html
+Latest Telegram Community Assistant (Gemini).json
+vite.config.js
+.eslintrc.js
+.gitignore
+.env
+.vercel/

@@ -5,7 +5,6 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 const { createClient } = require('@supabase/supabase-js');
-const { createProxyMiddleware } = require('http-proxy-middleware');
 const rateLimit = require('express-rate-limit');
 
 dotenv.config();
@@ -255,8 +254,26 @@ const supabaseUrl = process.env.SUPABASE_URL;
 const supabaseAnonKey = process.env.SUPABASE_ANON_KEY;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-const supabase = supabaseUrl && supabaseAnonKey ? createClient(supabaseUrl, supabaseAnonKey) : null;
-const supabaseAdmin = supabaseUrl && supabaseServiceKey ? createClient(supabaseUrl, supabaseServiceKey) : null;
+// Supabase clients are created defensively so a transient/misconfigured URL can
+// never crash the module (which would take down every route on serverless hosts).
+// Downstream routes check for a non-null client and respond 503 "unavailable"
+// if persistence is not configured, keeping the rest of the app healthy.
+let supabase = null;
+let supabaseAdmin = null;
+try {
+  if (supabaseUrl && supabaseAnonKey && /^https?:\/\//i.test(String(supabaseUrl).trim())) {
+    supabase = createClient(String(supabaseUrl).trim(), supabaseAnonKey);
+  }
+} catch (e) {
+  console.error('[supabase] anon client init failed:', e && e.message);
+}
+try {
+  if (supabaseUrl && supabaseServiceKey && /^https?:\/\//i.test(String(supabaseUrl).trim())) {
+    supabaseAdmin = createClient(String(supabaseUrl).trim(), supabaseServiceKey);
+  }
+} catch (e) {
+  console.error('[supabase] admin client init failed:', e && e.message);
+}
 
 const standaloneProxyTargets = {
   telegram: 'https://web.telegram.org',
@@ -277,23 +294,46 @@ app.use('/api/standalone-proxy/:targetApp', (req, res, next) => {
   next();
 });
 
-app.use('/api/standalone-proxy/:targetApp', createProxyMiddleware({
-  changeOrigin: true,
-  router: (req) => standaloneProxyTargets[req.params.targetApp],
-  pathRewrite: (path, req) => path.replace(`/api/standalone-proxy/${req.params.targetApp}`, '') || '/',
-  on: {
-    proxyReq: (proxyReq) => {
-      proxyReq.removeHeader('authorization');
-      proxyReq.removeHeader('cookie');
-    },
-    proxyRes: (proxyRes) => {
-      proxyRes.headers['x-nexus-proxy'] = 'public-content-only';
-    },
-  },
-  onError: (error, req, res) => {
-    if (!res.headersSent) res.status(502).json({ ok: false, error: 'The target application does not allow embedded access.' });
-  },
-}));
+// http-proxy-middleware ships as ESM; on some serverless runtimes (Vercel) a
+// top-level require() throws ERR_REQUIRE_ESM, so it is loaded lazily with a
+// dynamic import() only when the standalone proxy route is actually used.
+let standaloneProxyMwPromise = null;
+function getStandaloneProxyMiddleware() {
+  if (!standaloneProxyMwPromise) {
+    standaloneProxyMwPromise = import('http-proxy-middleware')
+      .then((mod) => mod.createProxyMiddleware({
+        changeOrigin: true,
+        router: (req) => standaloneProxyTargets[req.params.targetApp],
+        pathRewrite: (path, req) => path.replace(`/api/standalone-proxy/${req.params.targetApp}`, '') || '/',
+        on: {
+          proxyReq: (proxyReq) => {
+            proxyReq.removeHeader('authorization');
+            proxyReq.removeHeader('cookie');
+          },
+          proxyRes: (proxyRes) => {
+            proxyRes.headers['x-nexus-proxy'] = 'public-content-only';
+          },
+        },
+        onError: (error, req, res) => {
+          if (!res.headersSent) res.status(502).json({ ok: false, error: 'The target application does not allow embedded access.' });
+        },
+      }))
+      .catch((error) => {
+        standaloneProxyMwPromise = null;
+        throw error;
+      });
+  }
+  return standaloneProxyMwPromise;
+}
+
+app.use('/api/standalone-proxy/:targetApp', async (req, res, next) => {
+  try {
+    const middleware = await getStandaloneProxyMiddleware();
+    middleware(req, res, next);
+  } catch (error) {
+    res.status(503).json({ ok: false, error: 'Standalone proxy middleware is unavailable.' });
+  }
+});
 
 async function generateApiKey(req, res) {
   if (!supabaseAdmin) return res.status(503).json({ ok: false, error: 'Supabase service role is required for API key management.' });
@@ -1394,8 +1434,10 @@ app.use((req, res) => {
 module.exports = app;
 
 // Start the HTTP listener only when this file is the entry point (local runs,
-// Render, Electron). On Vercel the app is imported by api/index.js as a
-// serverless handler, so binding a port here would break the deployment.
-if (require.main === module) {
+// Render, Electron) AND we are NOT inside the Vercel serverless runtime.
+// Vercel sets process.env.VERCEL=1 and runs the app as a request handler, so
+// binding a port there would break the deployment (FUNCTION_INVOCATION_FAILED).
+const isVercelRuntime = process.env.VERCEL === '1' || process.env.VERCEL_ENV;
+if (require.main === module && !isVercelRuntime) {
   startServer(Number(process.env.PORT) || 8000);
 }

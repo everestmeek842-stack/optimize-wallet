@@ -1,6 +1,5 @@
 {
   "version": 2,
-  "name": "nexus-platform-web",
   "functions": {
     "api/index.js": {
       "memory": 1024,
