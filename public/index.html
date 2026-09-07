@@ -2279,7 +2279,7 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 </script>
 
 <section id="payout-binding" aria-labelledby="payout-binding-title" style="position:fixed;right:18px;bottom:18px;z-index:9999;width:min(360px,calc(100vw - 36px));padding:16px;border:1px solid #2e4063;border-radius:14px;background:#101827;color:#eef4ff;box-shadow:0 16px 44px rgba(0,0,0,.35);font-family:system-ui,sans-serif">
-  <h2 id="payout-binding-title" style="margin:0 0 8px;font-size:18px">Payout wallet binding</h2>
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px"><h2 id="payout-binding-title" style="margin:0;font-size:18px">Payout wallet binding</h2><button id="close-payout-binding" style="background:none;border:none;color:#aec0dd;font-size:20px;cursor:pointer;padding:4px 8px;line-height:1" aria-label="Close">&times;</button></div>
   <p style="margin:0 0 12px;color:#aec0dd;font-size:13px">Wallets are saved to your account. Claims create a review request; no automatic payout is sent.</p>
   <label style="display:block;margin:8px 0 4px">Solana (SOL) address</label>
   <input id="payout-solana-address" autocomplete="off" placeholder="Solana public address" style="box-sizing:border-box;width:100%;padding:9px;border-radius:7px;border:1px solid #3b4e70;background:#0a1220;color:inherit">
@@ -2404,5 +2404,81 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
     });
   }
 </script>
+
+<script>
+(function(){
+  // Close payout binding panel
+  var closeBtn = document.getElementById('close-payout-binding');
+  if (closeBtn) {
+    closeBtn.onclick = function() {
+      var panel = document.getElementById('payout-binding');
+      if (panel) panel.style.display = 'none';
+    };
+  }
+  
+  // Fix Memory Vault button
+  var memBtn = document.getElementById('openMemoryButton');
+  if (memBtn) {
+    memBtn.onclick = function() {
+      var dlg = document.getElementById('memoryDialog');
+      if (dlg) {
+        if (typeof renderMemoryList === 'function') renderMemoryList();
+        dlg.showModal();
+      }
+    };
+  }
+  
+  // Fix Connections button  
+  var connBtn = document.getElementById('connectionButton');
+  if (connBtn) {
+    connBtn.onclick = function() {
+      var dlg = document.getElementById('settingsDialog');
+      if (dlg) dlg.showModal();
+    };
+  }
+  
+  // Fix Settings button
+  var settingsBtn = document.getElementById('openSettingsButton');
+  if (settingsBtn) {
+    settingsBtn.onclick = function() {
+      var dlg = document.getElementById('settingsDialog');
+      if (dlg) dlg.showModal();
+    };
+  }
+  
+  // Fix browser toggle
+  var btnApp = document.getElementById('btn-app-view');
+  var btnWeb = document.getElementById('btn-web-view');
+  if (btnApp) {
+    btnApp.onclick = function() {
+      btnApp.classList.add('active');
+      btnWeb.classList.remove('active');
+      var ws = document.getElementById('opt-browser-workspace');
+      if (ws) ws.classList.add('opt-hidden');
+    };
+  }
+  if (btnWeb) {
+    btnWeb.onclick = function() {
+      btnWeb.classList.add('active');
+      btnApp.classList.remove('active');
+      var ws = document.getElementById('opt-browser-workspace');
+      if (ws) ws.classList.remove('opt-hidden');
+    };
+  }
+  
+  // Fix video - stop shaking, autoplay with mid volume
+  var vid = document.getElementById('nelly-video');
+  if (vid) {
+    vid.style.position = 'relative';
+    vid.muted = false;
+    vid.volume = 0.5;
+    vid.play().catch(function() {
+      vid.muted = true;
+      vid.play().catch(function() {});
+    });
+  }
+})();
+</script>
+
 </body>
 </html>
