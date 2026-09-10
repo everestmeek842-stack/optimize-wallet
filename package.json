@@ -9,16 +9,20 @@
     "server": "node server.js",
     "dev": "node server.js",
     "build": "node build-verification.js",
+    "build:vercel": "echo 'No build required - static files only'",
+    "build:render": "npm install",
     "verify": "node deployment-verification.js",
     "verify:deployment": "node deployment-verification.js",
     "build:android": "cd android && gradlew assembleRelease",
     "build:windows": "electron-builder build --win --publish never",
-    "explorer": "npm start"
+    "explorer": "npm start",
+    "clean": "rimraf node_modules package-lock.json && npm install",
+    "prestart": "node -e \"console.log('Starting Nexus Platform...')\""
   },
   "author": "SREYMARA & KANSAS",
   "license": "MIT",
   "engines": {
-    "node": ">=18"
+    "node": ">=18.0.0"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.45.4",
@@ -31,7 +35,8 @@
   "devDependencies": {
     "electron": "^28.0.0",
     "electron-builder": "^24.9.0",
-    "electron-packager": "^17.1.2"
+    "electron-packager": "^17.1.2",
+    "rimraf": "^5.0.0"
   },
   "build": {
     "appId": "com.sreymara.nellystv",
@@ -49,5 +54,19 @@
       "oneClick": false,
       "allowToChangeInstallationDirectory": true
     }
-  }
+  },
+  "keywords": [
+    "nexus",
+    "nellystv",
+    "web3",
+    "superapp",
+    "wallet",
+    "cinema",
+    "telegram"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/everestmeek842-stack/optimize-wallet.git"
+  },
+  "homepage": "https://nexus-platform-web-five.vercel.app"
 }
