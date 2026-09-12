@@ -1,0 +1,50 @@
+const fs=require('fs');
+const yaml=`services:
+  - type: web
+    name: nexus-platform-web
+    env: node
+    plan: free
+    region: oregon
+    branch: master
+    autoDeploy: true
+    buildCommand: npm install
+    startCommand: node server.js
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: APP_ENV
+        value: production
+      - key: APP_NAME
+        value: Nexus Platform
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_ANON_KEY
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: TELEGRAM_BOT_TOKEN
+        sync: false
+      - key: TELEGRAM_CHAT_ID
+        sync: false
+      - key: MASTER_WALLET_ADDRESS
+        sync: false
+      - key: MASTER_WALLET_NETWORK
+        value: solana
+      - key: SESSION_SECRET
+        sync: false
+      - key: ADMIN_API_KEY
+        sync: false
+      - key: PAYOUT_MODE
+        value: manual_review
+      - key: AIRDROP_COOLDOWN_MINUTES
+        value: "15"
+      - key: LOG_LEVEL
+        value: info
+      - key: ENABLE_TELEGRAM_ALERTS
+        value: "true"
+      - key: ENABLE_SUPABASE
+        value: "true"
+`;
+fs.writeFileSync('render.yaml', yaml);
+console.log('render.yaml updated');
