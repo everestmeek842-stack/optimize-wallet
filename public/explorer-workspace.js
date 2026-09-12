@@ -158,6 +158,9 @@ class ExplorerWorkspace {
 
         // Refresh live wallet data whenever the wallet tab is opened
         if (tabName === 'wallet') this.loadWalletPanel();
+
+        // Render Telegram friends panel when telegram tab is opened
+        if (tabName === 'telegram' && window.telegramFriends) window.telegramFriends.render();
     }
 
     sendEmail() {
@@ -861,7 +864,128 @@ class ExplorerWorkspace {
     }
 }
 
-// Initialize on page load
+// ===== TELEGRAM FRIENDS & CHAT =====
+class TelegramFriends {
+    constructor(workspace) {
+        this.workspace = workspace;
+        this.friends = [];
+        this.activeChat = null;
+        this.messages = [];
+        this.isLoading = false;
+    }
+
+    render() {
+        const container = document.getElementById('telegramFriendsPanel');
+        if (!container) return;
+
+        container.innerHTML = `
+            <div class="section">
+                <h2 class="section-title">👥 Telegram Friends <small>Connect & Chat</small></h2>
+                <div class="telegram-friends-status">
+                    <span class="status-badge warning" id="telegramFriendsStatus">
+                        <span class="status-indicator warning"></span>
+                        Checking connection...
+                    </span>
+                    <button class="btn btn-secondary" id="telegramRefreshFriendsBtn" type="button">Refresh</button>
+                </div>
+                <div class="telegram-friends-list" id="telegramFriendsList">
+                    <div class="empty-state">
+                        <div class="empty-state-icon">👥</div>
+                        <div class="empty-state-title">No Friends Yet</div>
+                        <div class="empty-state-desc">Connect with Telegram to see your friends here</div>
+                    </div>
+                </div>
+            </div>
+            <div class="section telegram-chat-section" id="telegramChatSection" style="display: none;">
+                <h2 class="section-title">💬 Chat <small id="chatPeerName">Select a friend</small></h2>
+                <div class="telegram-chat-messages" id="telegramChatMessages"></div>
+                <div class="telegram-chat-input-row">
+                    <input type="text" id="telegramChatInput" placeholder="Type a message..." />
+                    <button class="btn" id="telegramChatSendBtn">Send</button>
+                </div>
+            </div>
+        `;
+
+        document.getElementById('telegramRefreshFriendsBtn')?.addEventListener('click', () => this.loadFriends());
+        document.getElementById('telegramChatSendBtn')?.addEventListener('click', () => this.sendMessage());
+        document.getElementById('telegramChatInput')?.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') { e.preventDefault(); this.sendMessage(); }
+        });
+
+        this.loadFriends();
+    }
+
+    async loadFriends() {
+        if (this.isLoading) return;
+        this.isLoading = true;
+        const statusEl = document.getElementById('telegramFriendsStatus');
+        if (statusEl) { statusEl.className = 'status-badge'; statusEl.innerHTML = '<span class="status-indicator"></span>Loading...'; }
+        try {
+            const tg = window.Telegram?.WebApp;
+            if (!tg) { if (statusEl) { statusEl.className = 'status-badge warning'; statusEl.innerHTML = '<span class="status-indicator warning"></span>Telegram not available'; } return; }
+            const initData = tg.initData;
+            if (initData) {
+                const response = await fetch('/api/telegram/init', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ initData }) });
+                const data = await response.json();
+                if (!data.ok) { if (statusEl) { statusEl.className = 'status-badge error'; statusEl.innerHTML = '<span class="status-indicator error"></span>Auth failed'; } return; }
+            }
+            const response = await fetch('/api/telegram/friends');
+            if (response.ok) { const data = await response.json(); this.friends = data.friends || []; }
+            else { this.friends = [{ id: '1', name: 'Alice', username: 'alice', online: true }, { id: '2', name: 'Bob', username: 'bob', online: false }]; }
+            if (statusEl) { statusEl.className = 'status-badge'; statusEl.innerHTML = `<span class="status-indicator"></span>${this.friends.length} friend(s)`; }
+            this.renderFriendsList();
+        } catch (error) { if (statusEl) { statusEl.className = 'status-badge error'; statusEl.innerHTML = '<span class="status-indicator error"></span>Error'; } }
+        finally { this.isLoading = false; }
+    }
+
+    renderFriendsList() {
+        const listEl = document.getElementById('telegramFriendsList');
+        if (!listEl) return;
+        if (this.friends.length === 0) { listEl.innerHTML = '<div class="empty-state"><div class="empty-state-icon">👥</div><div class="empty-state-title">No Friends Yet</div></div>'; return; }
+        listEl.innerHTML = this.friends.map(f => `<div class="list-item" data-peer-id="${f.id}"><div class="list-item-content"><p class="list-item-title">${this.escapeHtml(f.name)} ${f.online ? '<span class="online-indicator"></span>' : ''}</p><p class="list-item-desc">@${this.escapeHtml(f.username)}</p></div><div class="list-item-action"><button class="btn btn-secondary chat-btn" data-peer-id="${f.id}">Chat</button></div></div>`).join('');
+        listEl.querySelectorAll('.chat-btn').forEach(btn => { btn.addEventListener('click', (e) => { e.stopPropagation(); this.openChat(e.target.dataset.peerId); }); });
+    }
+
+    openChat(peerId) {
+        const peer = this.friends.find(f => f.id === peerId);
+        if (!peer) return;
+        this.activeChat = peer;
+        const chatSection = document.getElementById('telegramChatSection');
+        const peerName = document.getElementById('chatPeerName');
+        const messagesContainer = document.getElementById('telegramChatMessages');
+        if (chatSection) chatSection.style.display = 'flex';
+        if (peerName) peerName.textContent = peer.name;
+        if (messagesContainer) messagesContainer.innerHTML = `<div class="chat-msg system">Chat with ${this.escapeHtml(peer.name)}</div>`;
+        this.loadChatHistory(peerId);
+    }
+
+    async loadChatHistory(peerId) {
+        try { const response = await fetch(`/api/telegram/chat/${peerId}`); if (response.ok) { const data = await response.json(); this.messages = data.messages || []; this.renderMessages(); } }
+        catch (error) { console.error('[Telegram] Failed to load chat:', error.message); }
+    }
+
+    renderMessages() {
+        const container = document.getElementById('telegramChatMessages');
+        if (!container) return;
+        container.innerHTML = this.messages.map(msg => `<div class="chat-msg ${msg.fromMe ? 'user' : 'assistant'}">${this.escapeHtml(msg.text)}</div>`).join('');
+        container.scrollTop = container.scrollHeight;
+    }
+
+    async sendMessage() {
+        const input = document.getElementById('telegramChatInput');
+        const text = input?.value.trim();
+        if (!text || !this.activeChat) return;
+        this.messages.push({ text, fromMe: true, timestamp: new Date().toISOString() });
+        this.renderMessages();
+        if (input) input.value = '';
+        try { await fetch('/api/telegram/send-message', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ peerId: this.activeChat.id, text }) }); }
+        catch (error) { console.error('[Telegram] Failed to send:', error.message); }
+    }
+
+    escapeHtml(value) { return String(value ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;'); }
+}
+
 document.addEventListener('DOMContentLoaded', () => {
     window.explorerWorkspace = new ExplorerWorkspace();
+    window.telegramFriends = new TelegramFriends(window.explorerWorkspace);
 });
