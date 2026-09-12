@@ -1,0 +1,21 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Test App in Browser (localhost:4000)",
+      "type": "chrome",
+      "request": "launch",
+      "url": "http://localhost:4000",
+      "webRoot": "${workspaceFolder}",
+      "preLaunchTask": "Start Nexus App (local test)"
+    },
+    {
+      "name": "Test Explorer Workspace",
+      "type": "chrome",
+      "request": "launch",
+      "url": "http://localhost:4000/explorer",
+      "webRoot": "${workspaceFolder}",
+      "preLaunchTask": "Start Nexus App (local test)"
+    }
+  ]
+}
